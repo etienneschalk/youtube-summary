@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ai-xp"
+version = "0.1.0"
+description = ""
+authors = ["eschalk <etienne.schalk@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.13,<3.14"
+youtube-transcript-api = "^1.0.3"
+ipykernel = "^6.29.5"
+tiktoken = "^0.9.0"
+youtube-extract = "^1.4.0"
+pafy = "^0.5.5"
+youtube-dl = "^2021.12.17"
+youte = "^2.6.1"
+tomli = "^2.2.1"
+pandas = "^2.2.3"
+python-slugify = "^8.0.4"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

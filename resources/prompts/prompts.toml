@@ -1,0 +1,20 @@
+[prompts.user]
+basic = """
+Tu es un assistant qui synthétises les transcripts vidéo. 
+Résume les points clefs du transcript qui suit.
+Pour chaque point clef, écris une liste à puces de 3 à 5 éléments.
+Le transcript est en français et je souhaite un résumé en français.
+Voici le transcript:
+
+{transcript}
+"""
+
+[prompts.assistant]
+basic = """
+I need to structure these points concisely in French,
+ensuring each major topic is covered with its key arguments and outcomes. 
+The user likely wants a clear, structured summary without missing critical debates or perspectives. 
+I should avoid personal opinions and stick to the transcript's content, 
+highlighting the main discussions, differing viewpoints, and conclusions where present. 
+Also, noting the cultural and political implications of each topic as discussed by the panelists.
+"""
