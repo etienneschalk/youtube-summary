@@ -37,25 +37,38 @@ def main():
     dry_run = True
     dry_run = False
     skip = 48  # argument to manually retrigger a failed run and restore cursor in the list.
-    skip = 112
+    skip = 29
+    skip = 0
+    print(f"{skip=}")
+    slug_whitelist = ["clinical-psychologist-reviews-ai-therapists"]
+    slug_whitelist = []
 
-    time_id = pd.Timestamp.now().isoformat()
+    now = pd.Timestamp.now()
+    time_id = slugify(now.isoformat(), lowercase=False)
     output_dir_path = Path("generated") / "llm_output" / time_id
     if not dry_run:
         output_dir_path.mkdir(exist_ok=True, parents=True)
 
     videos_to_summarize = json.loads(
-        Path("resources/inputs/2025-04-06.json").read_text()
+        # Path("resources/inputs/2025-04-06.json").read_text()
+        # Path("resources/inputs/2025-04-09.json").read_text()
+        Path(f"resources/inputs/{now:%Y-%m-%d}.json").read_text()
     )
+
     for idx, video_to_summarize in enumerate(videos_to_summarize, 1):
-        if skip >= idx:
+        if skip > idx:
             continue
+
         title = video_to_summarize["title"]
         href = video_to_summarize["href"]
         if "shorts" in href:
             print("Shorts not implemented yet, continue.")
             continue
         title_slug = slugify(title)
+
+        if slug_whitelist and title_slug not in slug_whitelist:
+            print("Continue because not in whitelist")
+            continue
 
         output_file_path = (output_dir_path / title_slug).with_suffix(".md")
 

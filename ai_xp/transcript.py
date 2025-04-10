@@ -14,7 +14,7 @@ def get_youtube_transcript(
 ) -> str | None:
     # ISO 639-1 language code
     languages = (languages,) if isinstance(languages, str) else languages
-    video_id = parse_qs(urlparse(video_url).query)["v"][0]
+    video_id = extract_video_id(video_url)
     try:
         # Try preferred language. If the language is not available this will fail.
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)  # type: ignore
@@ -24,3 +24,15 @@ def get_youtube_transcript(
     except Exception as exc:
         print(f"Error fetching transcript: {exc}")
         return None
+
+
+def extract_video_id(video_url: str) -> str:
+    if "/shorts" in video_url:
+        return video_url.split("/")[-1]
+    else:
+        return parse_qs(urlparse(video_url).query)["v"][0]
+
+
+if __name__ == "__main__":
+    video_url = "https://www.youtube.com/watch?v=id1LEPLrp7c"
+    print(get_youtube_transcript(video_url, ("fr",)))
