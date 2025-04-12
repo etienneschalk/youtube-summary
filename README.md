@@ -62,7 +62,7 @@ Copy the output in a JSON file.
 - [ ] Add multi-language processing (eg, I want to generate everything twice, in french and english. Or add a translation prompt from french to english and vice-versa)
 - [ ] Support Shorts
 - [ ] Check full Youtube History export helper lib: https://github.com/menggatot/youtube-watch-history-to-csv
-- [ ] Use title tag from video to extract at least the title, and inspect the description manually. Code susceptible to break frequently.
+- [ ] Use title tag from video to extract at least the title, and inspect the description manually. Code susceptible to break frequently. See example HTML File.
 - [ ] Also use a pure txt file with list of videos as input source. To copy paste easily.
 
 ## Commentaire sur une vidéo YouTube
