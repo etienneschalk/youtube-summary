@@ -61,3 +61,43 @@ Copy the output in a JSON file.
 - [ ] Use all input json files as a database, using video IDs as primary key
 - [ ] Add multi-language processing (eg, I want to generate everything twice, in french and english. Or add a translation prompt from french to english and vice-versa)
 - [ ] Support Shorts
+- [ ] Check full Youtube History export helper lib: https://github.com/menggatot/youtube-watch-history-to-csv
+
+## Commentaire sur une vidéo YouTube
+
+@PurePolitique Je récupère les sous-titres de la vidéo que j'envoie ensuite à un modèle de langage à utilisation gratuite en lui demandant de le résumer.
+
+Le modèle utilisé est : https://openrouter.ai/deepseek/deepseek-chat-v3-0324:free/api
+
+Le prompt utilisé est :
+
+"Tu es un assistant qui synthétises les transcripts vidéo.
+Résume les points clefs du transcript qui suit.
+Pour chaque point clef, écris une liste à puces de 3 à 5 éléments.
+Le transcript est en français et je souhaite un résumé en français.
+Voici le transcript:
+
+{transcript}"
+
+Et {transcript} est remplacé par l'ensemble des sous-titres, insérés tels quels.
+
+Pour récupérer les transcripts (sous-titres) j'utilise une bibliothèque Python : https://pypi.org/project/youtube-transcript-api/
+
+Note : en plus du prompt je rajoute un "assistant" (je ne connais pas trop les LLM, mais je laisse car ça marchait bien). Cet "assistant", je ne l'ai pas écrit contrairement au prompt. Je l'ai récupéré d'un "raisonnement" du modèle r1-1776 de "Perplexity AI": https://labs.perplexity.ai/ (à noter que ce modèle est aussi disponible pour utilisation automatique sur https://openrouter.ai/perplexity/r1-1776 mais il est payant)
+
+"I need to structure these points concisely in French,
+ensuring each major topic is covered with its key arguments and outcomes.
+The user likely wants a clear, structured summary without missing critical debates or perspectives.
+I should avoid personal opinions and stick to the transcript's content,
+highlighting the main discussions, differing viewpoints, and conclusions where present.
+Also, noting the cultural and political implications of each topic as discussed by the panelists."
+
+Attention, il faut bien relire les résumés, car parfois des points-clefs sont oubliés ce qui introduit un "biais d'omission". En expérimentant avec les prompts, et sur une autre vidéo, j'avais remarqué que l'IA "oubliait" parfois de mentionner les points de vue de l'opposition... en ne mentionnant que le point de vue du groupe au pouvoir, ce qui biaisait énormément le résumé et le rendait inutilisable.
+
+Les noms et prénoms sont aussi fréquemment charcutés, surtout lorsque les sous-titres sont générés automatiquement. Il faut repasser manuellement derrière, ou bien une autre solution serait de donner dans le prompt la liste des noms et prénoms des personnalités mentionnées dans une vidéo. Sur 28 minutes de Arte par exemple, la description contient toujours les 3 noms des intervenants, mais je n'ai hélas pas réussi à récupérer automatiquement les descriptions de vidéos youtube sans trop d'effort (les bibliothèques Python semblaient en panne).
+
+PS : merci pour vos vidéos qui sont toujours un plaisir à regarder !
+
+Voici mon code si cela vous intéresse (c'est brouillon, je suis en train de bidouiller) : https://github.com/etienneschalk/youtube-summary
+
+PS : merci pour vos vidéos qui sont toujours un plaisir à regarder !
