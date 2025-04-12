@@ -30,14 +30,60 @@ class FileDatabase:
     def search(self, df: pd.DataFrame, value: str) -> pd.DataFrame:
         return search(df, value)
 
-    def inputs_with_missing_outputs(self) -> pd.DataFrame:
-        return self.inputs_dataframe[
-            ~self.inputs_dataframe["title_slug"].isin(
-                self.outputs_dataframe.reset_index(level="title_slug")[
-                    "title_slug"
-                ].unique()
-            )
-        ]
+    def inputs_with_missing_outputs(self, keep: str = "last") -> pd.DataFrame:
+        mask = ~self.inputs_dataframe["title_slug"].isin(
+            self.outputs_dataframe.reset_index(level="title_slug")[
+                "title_slug"
+            ].unique()
+        )
+        out_df = self.inputs_dataframe[mask]
+        errors_df_of_interest = (
+            self.get_errors_df()
+            .reset_index()
+            .drop_duplicates(
+                subset="title_slug", keep=keep
+            )  # keep last by default because it is the most recent error.
+            .loc[
+                self.get_errors_df()
+                .reset_index()["title_slug"]
+                .isin(out_df["title_slug"])
+            ]
+        )
+        final_df = pd.merge(
+            out_df.reset_index(), errors_df_of_interest, how="left", on="title_slug"
+        ).set_index(["id"])
+        # ).set_index(["timestamp", "id", "title_slug"])
+        return final_df
+        # self.get_errors_df().reset_index().drop_duplicates(
+        #     subset="title_slug", keep="last"
+        # )[["title_slug", "exc_name"]]
+
+        # self.get_errors_df().loc[out_df["title_slug"]]
+        # out_df["exc_name"] = self.get_errors_df()[mask]["exc_name"]
+        # return out_df
+
+    def get_error_mask(self) -> pd.DataFrame:
+        return self.outputs_dataframe.index.get_level_values("title_slug").str.endswith(
+            ".err"
+        )
+
+    def get_success_df(self) -> pd.DataFrame:
+        error_mask = self.get_error_mask()
+        df = self.outputs_dataframe.loc[~error_mask]
+        return df
+
+    def get_errors_df(self) -> pd.DataFrame:
+        error_mask = self.get_error_mask()
+        errors_df = self.outputs_dataframe.loc[error_mask].reset_index()
+        split_df = (
+            errors_df["title_slug"]
+            .str.split(".", n=2, expand=True)
+            .rename(dict(zip(range(3), ["title_slug", "exc_name", "suffix"])), axis=1)
+        )
+        errors_df["title_slug"] = split_df["title_slug"]
+        errors_df["exc_name"] = split_df["exc_name"]
+        errors_df = errors_df.set_index(["timestamp", "title_slug"])
+        return errors_df
 
 
 def inputs_dataframe(inputs_lookup_dir_path: Path) -> pd.DataFrame:
@@ -57,7 +103,7 @@ def consolidate_input_json(lookup_dir_path: Path):
     all_videos = [video for p in all_json_paths for video in json.loads(p.read_text())]
 
     for video in all_videos:
-        video["title_slug"] = slugify(video["title"])
+        video["title_slug"] = slugify(video["title"]) or "untitled"
         identifier = extract_video_id(video["href"])
         video["id"] = identifier
         video["href"] = "https://www.youtube.com/watch?v=" + identifier
@@ -94,7 +140,7 @@ def consolidated_to_output_dataframe(
 ) -> pd.DataFrame:
     df = pd.DataFrame(
         [(k, vv.stem, vv) for k, v in consolidated.items() for vv in v],
-        columns=["timestamp", "title_slug", "path"],
+        columns=["timestamp", "title_slug", "output_path"],
     )
     df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%dT%H-%M-%S-%f")
     df = df.set_index(["timestamp", "title_slug"])

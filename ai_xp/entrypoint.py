@@ -46,7 +46,7 @@ def main():
         if "shorts" in href:
             print("Shorts not implemented yet, continue.")
             continue
-        title_slug = slugify(title)
+        title_slug = slugify(title) or "untitled"
 
         if slug_whitelist and title_slug not in slug_whitelist:
             print("Continue because not in whitelist")
@@ -83,8 +83,11 @@ def main():
 
                     print(f"[ OK] Written [[{title}]] into {output_file_path}")
                 else:
-                    summary = f"<<<ERROR>>>: {type(result.error).__name__}\n{str(result.error)}"
-                    error_output_file_path = output_file_path.with_suffix(".err.md")
+                    exc_name = type(result.error).__name__
+                    summary = f"<<<ERROR>>>: {exc_name}\n{str(result.error)}"
+                    error_output_file_path = output_file_path.with_suffix(
+                        f".{exc_name}.err.md"
+                    )
                     error_output_file_path.write_text(summary)
 
                     print(f"[NOK] Written [[{title}]] into {error_output_file_path}")
