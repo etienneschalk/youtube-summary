@@ -42,7 +42,7 @@ def get_youtube_transcript(
         return TranscriptErrorResult(error=error)
 
 
-def extract_video_id(url: str):
+def extract_video_id(url: str) -> str | None:
     """Extrait l'ID de la vidéo YouTube avec les modules standards"""
     if not url:
         return None

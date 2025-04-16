@@ -5,6 +5,7 @@ from typing import Any, Self
 import pandas as pd
 
 from matplotlib import pyplot as plt
+from slugify import slugify
 import xarray as xr
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,8 @@ import json
 import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
+
+from ai_xp.transcript import extract_video_id
 
 path = Path(
     "/home/tselano/Downloads/takeout-20250416T125258Z-001/Takeout/YouTube et YouTube Music/historique/watch-history.json"
@@ -95,13 +98,46 @@ class YouTubeHistoryAnalyzer:
     xds: xr.Dataset
 
     @classmethod
-    def from_path(cls, path: Path | str, *, drop_url_duplicates: bool = True) -> Self:
+    def from_path(
+        cls,
+        path: Path | str,
+        *,
+        drop_url_duplicates: bool = True,
+        lang: str = "fr",
+        consolidate: bool = False,
+    ) -> Self:
         """Create a YouTubeHistory instance from a JSON file path."""
         path = Path(path)
 
         # Load JSON data
         with open(path, "r") as fp:
             raw_history_json = json.load(fp)
+
+        # Consolidate a bit
+        if consolidate:
+            for entry in raw_history_json:
+                if "www.youtube.com" in entry["title"]:
+                    entry["title"] = ""
+                elif lang == "fr":
+                    # Note: the prefix before the title must be found for all languages.
+                    # If it is not french, the prefix will just be kept
+                    entry["title"] = entry["title"].strip("Vous avez regardé ")
+                else:
+                    # Do nothing, the prefix will remain
+                    pass
+                entry["title_slug"] = slugify(entry["title"]) or "untitled"
+                if "titleUrl" in entry:
+                    if (
+                        entry["titleUrl"].startswith("https://www.youtube.com/playlist")
+                        or entry["titleUrl"] == "https://www.youtube.com/watch?v="
+                    ):
+                        continue
+
+                    print(entry["titleUrl"])
+                    identifier = extract_video_id(entry["titleUrl"])
+                    if identifier:
+                        entry["id"] = identifier
+                        entry["href"] = "https://www.youtube.com/watch?v=" + identifier
 
         # Create and preprocess DataFrame
         df = pd.DataFrame(raw_history_json)
