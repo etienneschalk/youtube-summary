@@ -5,20 +5,22 @@ from dataclasses import dataclass, field
 
 from pathlib import Path
 
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import YouTubeTranscriptApi, Transcript, FetchedTranscript
 from urllib.parse import urlparse, parse_qs
 
-from youtube_transcript_api._errors import YouTubeTranscriptApiException
+from youtube_transcript_api._errors import (
+    YouTubeTranscriptApiException,
+)
 
 
 @dataclass(kw_only=True, frozen=True)
 class TranscriptSuccessResult:
-    transcript: list[dict[str, Any]]
+    transcript: FetchedTranscript
 
     @property
     def full_text(self) -> str:
         # An entry contains text, start and duration.
-        return " ".join([entry["text"] for entry in self.transcript])  # type: ignore
+        return " ".join([entry["text"] for entry in self.transcript.to_raw_data()])  # type: ignore
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -28,18 +30,52 @@ class TranscriptErrorResult:
 
 def get_youtube_transcript(
     video_url: str,
-    languages: tuple[str, ...] | str,
+    preferred_languages: tuple[str, ...] | str,
 ) -> TranscriptSuccessResult | TranscriptErrorResult:
     # ISO 639-1 language code
-    languages = (languages,) if isinstance(languages, str) else languages
+    preferred_languages = (
+        (preferred_languages,)
+        if isinstance(preferred_languages, str)
+        else preferred_languages
+    )
     video_id = extract_video_id(video_url)
     try:
         # Try preferred language. If the language is not available this will fail.
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)  # type: ignore
-        return TranscriptSuccessResult(transcript=transcript)  # type: ignore
+        transcript = get_youtube_transcript_internal(
+            video_id, preferred_languages
+        ).fetch()
+        return TranscriptSuccessResult(transcript=transcript)
     except YouTubeTranscriptApiException as error:
         print(f"Error fetching transcript: {type(error).__name__}")
         return TranscriptErrorResult(error=error)
+
+
+def get_youtube_transcript_internal(
+    video_id: str,
+    preferred_languages: tuple[str, ...] | str,
+) -> Transcript:
+    ytt_api = YouTubeTranscriptApi()
+    transcript_list = ytt_api.list(video_id)
+    try:
+        result = transcript_list.find_transcript(preferred_languages)
+        return result
+    except YouTubeTranscriptApiException:
+        first_available_transcript = list(transcript_list)[0]
+        print(first_available_transcript.language_code)
+        available_translation_languages_codes = set(
+            t.language_code for t in first_available_transcript.translation_languages
+        )
+        for preferred_language in preferred_languages:
+            if preferred_language in available_translation_languages_codes:
+                translated_transcript = first_available_transcript.translate(
+                    preferred_language
+                )
+                result = translated_transcript
+                print(
+                    f"Translated transcript from {first_available_transcript.language_code} to {preferred_language}."
+                )
+                return result
+        raise
 
 
 def extract_video_id(url: str) -> str | None:

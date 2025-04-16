@@ -67,7 +67,7 @@ def main():
             try:
                 print(f"Fetching transcript for video: {href}")
                 # TODO eschalk autodectect language
-                result = get_youtube_transcript(href, languages=("fr", "fr-FR", "en"))
+                result = get_youtube_transcript(href, preferred_languages=("fr", "en"))
                 if isinstance(result, TranscriptSuccessResult):
                     api_key = retrieve_api_key()
                     proxy = OpenRouterAiProxy(api_key=api_key)
