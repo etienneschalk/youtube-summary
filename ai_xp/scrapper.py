@@ -39,14 +39,14 @@ class YouTubeHtmlScrapper:
         script_text = self.soup.body.script.text.replace("\n", "")
 
         if mode == "regex":
-            return self.try_to_extract_short_description(script_text)
+            return self.try_to_extract_short_description_with_regex(script_text)
         elif mode == "json":
             obj = json.loads(script_text.lstrip("var ytInitialPlayerResponse = ")[:-1])
             return obj["videoDetails"]["shortDescription"]
 
         raise NotImplementedError
 
-    def try_to_extract_short_description(self, script_text: str) -> str:
+    def try_to_extract_short_description_with_regex(self, script_text: str) -> str:
         patterns = [
             r'shortDescription":' + self.string_extraction_pattern,
             r"shortDescription:\s*" + self.string_extraction_pattern,

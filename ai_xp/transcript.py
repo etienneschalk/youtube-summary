@@ -42,11 +42,21 @@ def get_youtube_transcript(
         return TranscriptErrorResult(error=error)
 
 
-def extract_video_id(video_url: str) -> str:
-    if "/shorts" in video_url:
-        return video_url.split("/")[-1]
-    else:
-        return parse_qs(urlparse(video_url).query)["v"][0]
+def extract_video_id(url: str):
+    """Extrait l'ID de la vidéo YouTube avec les modules standards"""
+    if not url:
+        return None
+
+    parsed = urlparse(url)
+
+    if "youtu.be" in parsed.netloc:
+        return parsed.path.split("/")[1].split("&")[0]
+
+    if "youtube.com" in parsed.netloc:
+        params = parse_qs(parsed.query)
+        return params["v"][0] if "v" in params else parsed.path.split("/")[2]
+
+    return None
 
 
 if __name__ == "__main__":

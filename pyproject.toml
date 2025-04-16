@@ -19,6 +19,8 @@ pandas = "^2.2.3"
 python-slugify = "^8.0.4"
 bs4 = "^0.0.2"
 requests = "^2.32.3"
+xarray = "^2025.3.1"
+matplotlib = "^3.10.1"
 
 
 [tool.poetry.group.dev.dependencies]
