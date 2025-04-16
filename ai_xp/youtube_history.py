@@ -113,15 +113,20 @@ class YouTubeHistoryAnalyzer:
         with open(path, "r") as fp:
             raw_history_json = json.load(fp)
 
-        # Consolidate a bit
+        filtered_raw_history_json = raw_history_json
+
+        # Consolidate history to add necessary data for transcript and summary logic
         if consolidate:
+            filtered_raw_history_json = []
             for entry in raw_history_json:
                 if "www.youtube.com" in entry["title"]:
                     entry["title"] = ""
                 elif lang == "fr":
                     # Note: the prefix before the title must be found for all languages.
                     # If it is not french, the prefix will just be kept
-                    entry["title"] = entry["title"].strip("Vous avez regardé ")
+                    entry["title"] = (
+                        entry["title"].strip("Vous avez regardé ").strip("consulté ")
+                    )
                 else:
                     # Do nothing, the prefix will remain
                     pass
@@ -130,17 +135,19 @@ class YouTubeHistoryAnalyzer:
                     if (
                         entry["titleUrl"].startswith("https://www.youtube.com/playlist")
                         or entry["titleUrl"] == "https://www.youtube.com/watch?v="
+                        or "google.com/" in entry["titleUrl"]
                     ):
                         continue
 
-                    print(entry["titleUrl"])
                     identifier = extract_video_id(entry["titleUrl"])
                     if identifier:
                         entry["id"] = identifier
                         entry["href"] = "https://www.youtube.com/watch?v=" + identifier
 
+                    filtered_raw_history_json.append(entry)
+
         # Create and preprocess DataFrame
-        df = pd.DataFrame(raw_history_json)
+        df = pd.DataFrame(filtered_raw_history_json)
         df["time"] = pd.to_datetime(df["time"], format="mixed")
         df = df.sort_values("time")
         if drop_url_duplicates:

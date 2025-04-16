@@ -7,6 +7,7 @@ import pandas as pd
 from slugify import slugify
 
 from ai_xp.transcript import extract_video_id
+from ai_xp.youtube_history import YouTubeHistoryAnalyzer
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -87,9 +88,25 @@ class FileDatabase:
 
 
 def inputs_dataframe(inputs_lookup_dir_path: Path) -> pd.DataFrame:
-    all_videos = consolidate_input_json(inputs_lookup_dir_path)
-    df = pd.DataFrame.from_dict(all_videos.values()).set_index(["id"])
-    return df
+    all_json_videos = consolidate_input_json(inputs_lookup_dir_path)
+    all_json_df = pd.DataFrame.from_dict(all_json_videos.values())
+
+    watch_history_json_list = inputs_lookup_dir_path / "watch_history_json_list.txt"
+    assert watch_history_json_list.is_file()
+    paths = list(
+        Path(el) for el in watch_history_json_list.read_text().strip().split("\n")
+    )
+    df_list: list[pd.DataFrame] = []
+    for path in paths:
+        analyzer = YouTubeHistoryAnalyzer.from_path(path, consolidate=True)
+        normalized_df = analyzer.df[
+            ["title", "href", "title_slug", "id"]
+        ].drop_duplicates("id")
+        df_list.append(normalized_df)
+    histories_concat_df = (
+        pd.concat([all_json_df, *df_list]).drop_duplicates(subset="id").set_index("id")
+    )
+    return histories_concat_df
 
 
 def outputs_dataframe(outputs_lookup_dir_path: Path) -> pd.DataFrame:

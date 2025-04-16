@@ -17,9 +17,9 @@ from slugify import slugify
 def main():
     dry_run = True
     dry_run = False
-    skip = 48  # argument to manually retrigger a failed run and restore cursor in the list.
-    skip = 29
-    skip = 0
+    skip = (
+        0  # argument to manually retrigger a failed run and restore cursor in the list.
+    )
     print(f"{skip=}")
     slug_whitelist = ["clinical-psychologist-reviews-ai-therapists"]
     slug_whitelist = []
@@ -30,7 +30,7 @@ def main():
     if not dry_run:
         output_dir_path.mkdir(exist_ok=True, parents=True)
 
-    inputs_lookup_dir_path = Path("resources/inputs").resolve()
+    inputs_lookup_dir_path = Path("inputs").resolve()
     outputs_lookup_dir_path = Path("generated/llm_output").resolve()
     db = FileDatabase.from_paths(inputs_lookup_dir_path, outputs_lookup_dir_path)
     videos_to_summarize = db.inputs_with_missing_outputs()
@@ -43,13 +43,19 @@ def main():
 
         title = str(video_to_summarize["title"])
         href = str(video_to_summarize["href"])
-        if "shorts" in href:
-            print("Shorts not implemented yet, continue.")
-            continue
+        video_id = str(video_to_summarize["id"])
+
         title_slug = slugify(title) or "untitled"
 
         if slug_whitelist and title_slug not in slug_whitelist:
             print("Continue because not in whitelist")
+            continue
+
+        exc_name = videos_to_summarize.loc[video_id]["exc_name"]
+        if is_unrecoverable_error(exc_name):
+            print(
+                f"[SKIP] {href} Continue because latest transcript query resulted in {exc_name} error."
+            )
             continue
 
         output_file_path = (output_dir_path / title_slug).with_suffix(".md")
@@ -59,11 +65,9 @@ def main():
             print("Skip because dry run")
         else:
             try:
-                video_url = href
-                print(f"Fetching transcript for video: {video_url}")
-                result = get_youtube_transcript(
-                    video_url, languages=("fr", "fr-FR", "en")
-                )
+                print(f"Fetching transcript for video: {href}")
+                # TODO eschalk autodectect language
+                result = get_youtube_transcript(href, languages=("fr", "fr-FR", "en"))
                 if isinstance(result, TranscriptSuccessResult):
                     api_key = retrieve_api_key()
                     proxy = OpenRouterAiProxy(api_key=api_key)
@@ -74,14 +78,14 @@ def main():
                     assistant_content = available_prompts["prompts"]["assistant"][
                         "basic"
                     ]
-                    print(f"Generating summary for video: {video_url}")
+                    print(f"Generating summary for video: {href}")
                     response = proxy.prompt(
                         prompt.format(transcript=result.full_text), assistant_content
                     )
                     summary = response["choices"][0]["message"]["content"]
                     output_file_path.write_text(summary)
 
-                    print(f"[ OK] Written [[{title}]] into {output_file_path}")
+                    print(f"[  OK] Written [[{title}]] into {output_file_path}")
                 else:
                     exc_name = type(result.error).__name__
                     summary = f"<<<ERROR>>>: {exc_name}\n{str(result.error)}"
@@ -90,9 +94,19 @@ def main():
                     )
                     error_output_file_path.write_text(summary)
 
-                    print(f"[NOK] Written [[{title}]] into {error_output_file_path}")
+                    print(f"[ NOK] Written [[{title}]] into {error_output_file_path}")
             except RuntimeError as err:
                 print("Skip because failure: " + str(err))
+
+
+def is_unrecoverable_error(exc_name: str) -> bool:
+    errnames = ["TranscriptsDisabled", "NoTranscriptFound"]
+
+    # TODO eschalk NoTranscriptFound can maybe fixed by improving the transcript lang filtering.
+    for errname in errnames:
+        if exc_name == errname:
+            return True
+    return False
 
 
 if __name__ == "__main__":

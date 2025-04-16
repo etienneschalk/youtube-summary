@@ -49,6 +49,10 @@ def extract_video_id(url: str) -> str | None:
 
     parsed = urlparse(url)
 
+    if not parsed.netloc:
+        # Assume the id was provided as is.
+        return url
+
     if "youtu.be" in parsed.netloc:
         return parsed.path.split("/")[1].split("&")[0]
 
