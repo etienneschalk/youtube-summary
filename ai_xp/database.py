@@ -32,6 +32,8 @@ class FileDatabase:
         return search(df, value)
 
     def inputs_with_missing_outputs(self, keep: str = "last") -> pd.DataFrame:
+        # join_attr = "title_slug"
+        # join_attr = "id"
         mask = ~self.inputs_dataframe["title_slug"].isin(
             self.outputs_dataframe.reset_index(level="title_slug")[
                 "title_slug"
@@ -69,8 +71,11 @@ class FileDatabase:
             .str.split(".", n=2, expand=True)
             .rename(dict(zip(range(3), ["title_slug", "exc_name", "suffix"])), axis=1)
         )
-        errors_df["title_slug"] = split_df["title_slug"]
-        errors_df["exc_name"] = split_df["exc_name"]
+        if split_df.empty:
+            errors_df["exc_name"] = None
+        else:
+            errors_df["title_slug"] = split_df["title_slug"]
+            errors_df["exc_name"] = split_df["exc_name"]
         errors_df = errors_df.set_index(["timestamp", "title_slug"])
         return errors_df
 

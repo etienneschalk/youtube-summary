@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from pathlib import PurePosixPath
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from youtube_transcript_api import FetchedTranscript, Transcript, YouTubeTranscriptApi
@@ -11,10 +13,25 @@ from youtube_transcript_api._errors import (
 class TranscriptSuccessResult:
     transcript: FetchedTranscript
 
-    @property
     def full_text(self) -> str:
         # An entry contains text, start and duration.
         return " ".join([entry["text"] for entry in self.transcript.to_raw_data()])  # type: ignore
+
+    def full_text_multiple_lines(self) -> str:
+        # An entry contains text, start and duration.
+        return "\n".join([entry["text"] for entry in self.transcript.to_raw_data()])  # type: ignore
+
+    def to_json_serializable(self) -> dict[str, Any]:
+        dico = {k: v for k, v in self.transcript.__dict__.items()}
+        dico["snippets"] = self.transcript.to_raw_data()
+        return dico
+
+    def generate_path(self, title_slug: str) -> PurePosixPath:
+        source = "generated" if self.transcript.is_generated else "manually_created"
+        return PurePosixPath(
+            f"{self.transcript.language_code}.{source}.{self.transcript.video_id}.{title_slug}.json"
+            # f"{self.transcript.language_code}/{source}/{self.transcript.video_id}/{title_slug}.json"
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
