@@ -1,6 +1,5 @@
-from dataclasses import dataclass, field
 import json
-from pathlib import Path
+from dataclasses import dataclass, field
 
 import requests
 

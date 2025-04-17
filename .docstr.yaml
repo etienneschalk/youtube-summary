@@ -1,0 +1,17 @@
+# Config taken from https://github.com/HunterMcGushion/docstr_coverage?tab=readme-ov-file#config-file
+paths: # list or string
+  - ai_xp
+badge: docs # Path
+exclude: .*/(test)  # regex
+# verbose: 1 # int (0-4) (0 = laconic, 4 = voluble)
+verbose: 3
+skip_property: True # Boolean
+skip_magic: True # Boolean
+skip_file_doc: False # Boolean
+skip_init: True # Boolean
+skip_class_def: False # Boolean
+skip_private: True # Boolean
+follow_links: True # Boolean
+accept_empty: False # Boolean
+fail_under: 0 # int
+percentage_only: False # Boolean

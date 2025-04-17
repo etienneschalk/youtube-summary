@@ -1,0 +1,87 @@
+default_language_version:
+  python: python3.13
+default_stages: [pre-commit]
+files: ai_xp/.*
+repos:
+  # Pre-commit out-of-the-box hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # Ruff: Linter & Formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.10.0
+    hooks:
+      # Run the linter.
+      - id: ruff
+        # Prune unused imports:
+        # See https://github.com/astral-sh/ruff/issues/10882
+        args: [--extend-select, I, --fix]
+      # Run the formatter.
+      - id: ruff-format
+
+  # Add Trailing Commas
+  # - repo: https://github.com/asottile/add-trailing-comma
+  #   rev: v3.1.0
+  #   hooks:
+  #     - id: add-trailing-comma
+
+  # Static Code Analysis
+  - repo: https://github.com/rubik/xenon
+    rev: v0.9.3
+    hooks:
+      - id: xenon
+        args: [--max-absolute B, --max-modules A, --max-average A]
+
+  # Documentation Coverage
+  - repo: https://github.com/HunterMcGushion/docstr_coverage
+    rev: v2.3.2 # most recent docstr-coverage release or commit sha
+    hooks:
+      - id: docstr-coverage
+        name: docstr-coverage-commit
+        language_version: python3.13
+        # Use config from .docstr.yaml
+      - id: docstr-coverage
+        name: docstr-coverage-manual
+        language_version: python3.13
+        stages: [manual]
+        args: ["--fail-under", "100", "--verbose", "3"] # override the .docstr.yaml to see more info
+        # (note: --verbose 4 even logs successes.)
+
+  # Documentation Quality
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.6.2
+    hooks:
+      - id: pydoclint
+        args:
+          [
+            --style=numpy,
+            --check-return-types=True,
+            --arg-type-hints-in-docstring=True,
+          ]
+
+  # Type Checking with MyPy.
+  # Run with: $ pre-commit run --all --hook-stage manual
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        name: mypy-manual
+        args: []
+        stages: [manual]
+        additional_dependencies:
+          - types-requests
+          - types-beautifulsoup4
+          - types-tqdm
+          - pandas-stubs
+          - types-colorama
+          - types-shapely
+          - mypy

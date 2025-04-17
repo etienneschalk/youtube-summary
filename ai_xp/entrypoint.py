@@ -1,17 +1,13 @@
-import requests
 import json
-from dataclasses import dataclass, field
-import pandas as pd
 from pathlib import Path
 
-from youtube_transcript_api import YouTubeTranscriptApi
-from urllib.parse import urlparse, parse_qs
+import pandas as pd
+from slugify import slugify
 
 from ai_xp.database import FileDatabase
 from ai_xp.llm_proxy import OpenRouterAiProxy
 from ai_xp.transcript import TranscriptSuccessResult, get_youtube_transcript
 from ai_xp.utils import read_toml, retrieve_api_key
-from slugify import slugify
 
 
 class OpenRouterRateLimitExceeded(Exception):
@@ -123,6 +119,6 @@ def is_unrecoverable_error(exc_name: str) -> bool:
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt as exc:
+    except KeyboardInterrupt:
         print()
         print("Script interrupted by user.")

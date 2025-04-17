@@ -1,13 +1,7 @@
-from typing import Any
-import requests
-import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from urllib.parse import parse_qs, urlparse
 
-from pathlib import Path
-
-from youtube_transcript_api import YouTubeTranscriptApi, Transcript, FetchedTranscript
-from urllib.parse import urlparse, parse_qs
-
+from youtube_transcript_api import FetchedTranscript, Transcript, YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     YouTubeTranscriptApiException,
 )

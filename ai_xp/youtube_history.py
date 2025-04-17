@@ -1,18 +1,12 @@
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
-import pandas as pd
 
+import pandas as pd
+import xarray as xr
 from matplotlib import pyplot as plt
 from slugify import slugify
-import xarray as xr
-from dataclasses import dataclass
-from pathlib import Path
-import json
-import pandas as pd
-import xarray as xr
-from matplotlib import pyplot as plt
 
 from ai_xp.transcript import extract_video_id
 
