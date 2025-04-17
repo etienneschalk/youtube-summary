@@ -14,6 +14,10 @@ from ai_xp.utils import read_toml, retrieve_api_key
 from slugify import slugify
 
 
+class OpenRouterRateLimitExceeded(Exception):
+    pass
+
+
 def main():
     dry_run = True
     dry_run = False
@@ -44,6 +48,7 @@ def main():
         title = str(video_to_summarize["title"])
         href = str(video_to_summarize["href"])
         video_id = str(video_to_summarize["id"])
+        timestamp = str(video_to_summarize["timestamp"])
 
         title_slug = slugify(title) or "untitled"
 
@@ -65,7 +70,9 @@ def main():
             print("Skip because dry run")
         else:
             try:
-                print(f"Fetching transcript for video: {href}")
+                print(
+                    f"Fetching transcript for video: {href} (output date: {timestamp})"
+                )
                 # TODO eschalk autodectect language
                 result = get_youtube_transcript(href, preferred_languages=("fr", "en"))
                 if isinstance(result, TranscriptSuccessResult):
@@ -82,10 +89,14 @@ def main():
                     response = proxy.prompt(
                         prompt.format(transcript=result.full_text), assistant_content
                     )
-                    summary = response["choices"][0]["message"]["content"]
-                    output_file_path.write_text(summary)
-
-                    print(f"[  OK] Written [[{title}]] into {output_file_path}")
+                    if "error" in response:
+                        print(json.dumps(response, indent=4))
+                        print(response["error"]["message"])
+                        raise OpenRouterRateLimitExceeded(response["error"]["message"])
+                    else:
+                        summary = response["choices"][0]["message"]["content"]
+                        output_file_path.write_text(summary)
+                        print(f"[  OK] Written [[{title}]] into {output_file_path}")
                 else:
                     exc_name = type(result.error).__name__
                     summary = f"<<<ERROR>>>: {exc_name}\n{str(result.error)}"

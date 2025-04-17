@@ -125,7 +125,7 @@ class YouTubeHistoryAnalyzer:
                     # Note: the prefix before the title must be found for all languages.
                     # If it is not french, the prefix will just be kept
                     entry["title"] = (
-                        entry["title"].strip("Vous avez regardé ").strip("consulté ")
+                        entry["title"].lstrip("Vous avez regardé ").lstrip("consulté ")
                     )
                 else:
                     # Do nothing, the prefix will remain
@@ -134,6 +134,7 @@ class YouTubeHistoryAnalyzer:
                 if "titleUrl" in entry:
                     if (
                         entry["titleUrl"].startswith("https://www.youtube.com/playlist")
+                        or entry["titleUrl"].startswith("https://www.youtube.com/post")
                         or entry["titleUrl"] == "https://www.youtube.com/watch?v="
                         or "google.com/" in entry["titleUrl"]
                     ):

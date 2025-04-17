@@ -38,30 +38,18 @@ class FileDatabase:
             ].unique()
         )
         out_df = self.inputs_dataframe[mask]
+        errors_df = self.get_errors_df()
         errors_df_of_interest = (
-            self.get_errors_df()
-            .reset_index()
+            errors_df.reset_index()
             .drop_duplicates(
                 subset="title_slug", keep=keep
             )  # keep last by default because it is the most recent error.
-            .loc[
-                self.get_errors_df()
-                .reset_index()["title_slug"]
-                .isin(out_df["title_slug"])
-            ]
+            .loc[errors_df.reset_index()["title_slug"].isin(out_df["title_slug"])]
         )
         final_df = pd.merge(
             out_df.reset_index(), errors_df_of_interest, how="left", on="title_slug"
         ).set_index(["id"])
-        # ).set_index(["timestamp", "id", "title_slug"])
         return final_df
-        # self.get_errors_df().reset_index().drop_duplicates(
-        #     subset="title_slug", keep="last"
-        # )[["title_slug", "exc_name"]]
-
-        # self.get_errors_df().loc[out_df["title_slug"]]
-        # out_df["exc_name"] = self.get_errors_df()[mask]["exc_name"]
-        # return out_df
 
     def get_error_mask(self) -> pd.DataFrame:
         return self.outputs_dataframe.index.get_level_values("title_slug").str.endswith(
@@ -101,7 +89,7 @@ def inputs_dataframe(inputs_lookup_dir_path: Path) -> pd.DataFrame:
         analyzer = YouTubeHistoryAnalyzer.from_path(path, consolidate=True)
         normalized_df = analyzer.df[
             ["title", "href", "title_slug", "id"]
-        ].drop_duplicates("id")
+        ].drop_duplicates("id")[::-1]  # top = recent ; bottom = ancient
         df_list.append(normalized_df)
     histories_concat_df = (
         pd.concat([all_json_df, *df_list]).drop_duplicates(subset="id").set_index("id")

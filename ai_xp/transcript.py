@@ -34,9 +34,9 @@ def get_youtube_transcript(
 ) -> TranscriptSuccessResult | TranscriptErrorResult:
     # ISO 639-1 language code
     preferred_languages = (
-        (preferred_languages,)
-        if isinstance(preferred_languages, str)
-        else preferred_languages
+        preferred_languages
+        if isinstance(preferred_languages, tuple)
+        else (preferred_languages,)
     )
     video_id = extract_video_id(video_url)
     try:
@@ -60,7 +60,7 @@ def get_youtube_transcript_internal(
         result = transcript_list.find_transcript(preferred_languages)
         return result
     except YouTubeTranscriptApiException:
-        first_available_transcript = list(transcript_list)[0]
+        first_available_transcript = next(iter(transcript_list))
         print(first_available_transcript.language_code)
         available_translation_languages_codes = set(
             t.language_code for t in first_available_transcript.translation_languages
