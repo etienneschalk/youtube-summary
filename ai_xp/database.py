@@ -19,8 +19,18 @@ from ai_xp.youtube_history import YouTubeHistoryAnalyzer
 @dataclass(kw_only=True, frozen=True)
 class FileDatabase:
     input_lookup_dir_path: Path
+    # Assumption: time independant
+    # (refetching likely won't update metadata)
+    # Run a reprocessing if this is absolutely needed.
     metadata_lookup_dir_path: Path
+    # Assumption: time independant (refetching likely won't update transcript)
+    # (refetching likely won't update metadata)
+    # Run a reprocessing if this is absolutely needed.
     transcript_lookup_dir_path: Path
+    # Assumption: time dependant: indeed, LLM as a function is completely
+    # impure: each new run will lead to a different LLM outputs, even when the
+    # input is exactly the same. Manually selecting between multiple outputs
+    # might happen.
     llm_output_lookup_dir_path: Path
     input_dataframe: pd.DataFrame = field(repr=False)
     metadata_dataframe: pd.DataFrame = field(repr=False)
