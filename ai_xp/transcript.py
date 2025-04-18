@@ -1,12 +1,61 @@
-from dataclasses import dataclass
-from pathlib import PurePosixPath
-from typing import Any
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Self
 from urllib.parse import parse_qs, urlparse
 
 from youtube_transcript_api import FetchedTranscript, Transcript, YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
     YouTubeTranscriptApiException,
 )
+
+
+@dataclass(frozen=True, kw_only=True)
+class TranscriptPath:
+    language_code: str
+    source: str
+    video_id: str
+    title_slug: str
+    extension: str
+
+    @classmethod
+    def from_path(cls, path: Path | str) -> Self:
+        language_code, source, video_id, title_slug, extension = Path(path).name.split(
+            ".", maxsplit=5
+        )
+        return cls(
+            language_code=language_code,
+            source=source,
+            video_id=video_id,
+            title_slug=title_slug,
+            extension=extension,
+        )
+
+    @classmethod
+    def from_transcript(
+        cls, transcript: FetchedTranscript, title_slug: str, extension: str
+    ) -> Self:
+        source = "generated" if transcript.is_generated else "manually_created"
+        return cls(
+            language_code=transcript.language_code,
+            source=source,
+            video_id=transcript.video_id,
+            title_slug=title_slug,
+            extension=extension,
+        )
+
+    def to_filename(self) -> str:
+        return ".".join(
+            (
+                self.language_code,
+                self.source,
+                self.video_id,
+                self.title_slug,
+                self.extension,
+            )
+        )
+
+    def asdict(self) -> dict[str, str]:
+        return asdict(self)
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -21,17 +70,19 @@ class TranscriptSuccessResult:
         # An entry contains text, start and duration.
         return "\n".join([entry["text"] for entry in self.transcript.to_raw_data()])  # type: ignore
 
-    def to_json_serializable(self) -> dict[str, Any]:
-        dico = {k: v for k, v in self.transcript.__dict__.items()}
-        dico["snippets"] = self.transcript.to_raw_data()
-        return dico
+    def to_json_serializable(
+        self, *, additional_metadata: dict[str, str] | None
+    ) -> dict[str, Any]:
+        data = {k: v for k, v in self.transcript.__dict__.items()}
+        data["snippets"] = self.transcript.to_raw_data()
+        if additional_metadata:
+            data["metadata"] = additional_metadata
+        return data
 
-    def generate_path(self, title_slug: str) -> PurePosixPath:
-        source = "generated" if self.transcript.is_generated else "manually_created"
-        return PurePosixPath(
-            f"{self.transcript.language_code}.{source}.{self.transcript.video_id}.{title_slug}.json"
-            # f"{self.transcript.language_code}/{source}/{self.transcript.video_id}/{title_slug}.json"
-        )
+    def generate_transcript_filename(self, title_slug: str) -> str:
+        return TranscriptPath.from_transcript(
+            transcript=self.transcript, title_slug=title_slug, extension="json"
+        ).to_filename()
 
 
 @dataclass(kw_only=True, frozen=True)

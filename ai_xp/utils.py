@@ -3,6 +3,9 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+from slugify import slugify
+
 
 def sanitize_string(input_string: str) -> str:
     # Remove non-alphanumeric characters except spaces
@@ -37,3 +40,20 @@ def read_toml(file_path: Path) -> dict[str, Any]:
             return tomli.load(f)
     except ImportError:
         raise ImportError("Install 'tomli' first: pip install tomli")
+
+
+def render_title_slug(title: str, *, limit: int = 128) -> str:
+    # By default, limit to 128 characters.
+    # Indeed a filename can be 255 char max. Keep the rest for language code, video id
+    # and other information. The video id is the ultimate primary key.
+    slug = slugify(title) or "untitled"
+    return slug[:limit] if limit > 0 else slug
+
+
+def render_timestamp_slug(now: pd.Timestamp) -> str:
+    # Do not lowercase so the T-separator remains capitalized
+    return slugify(now.isoformat(), lowercase=False)
+
+
+def render_video_url(video_id: str) -> str:
+    return "https://www.youtube.com/watch?v=" + video_id

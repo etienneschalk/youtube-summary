@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from slugify import slugify
 
 from ai_xp.database import FileDatabase
 from ai_xp.llm_proxy import OpenRouterAiProxy
@@ -10,7 +9,13 @@ from ai_xp.transcript import (
     TranscriptSuccessResult,
     get_youtube_transcript,
 )
-from ai_xp.utils import read_toml, retrieve_api_key
+from ai_xp.utils import (
+    read_toml,
+    render_timestamp_slug,
+    render_title_slug,
+    render_video_url,
+    retrieve_api_key,
+)
 
 
 class OpenRouterRateLimitExceeded(Exception):
@@ -21,7 +26,7 @@ def main():
     dry_run = True
     dry_run = False
     with_ai_summary = False
-    with_ai_summary = True
+    # with_ai_summary = True
     skip = (
         0  # argument to manually retrigger a failed run and restore cursor in the list.
     )
@@ -29,7 +34,7 @@ def main():
     slug_whitelist = []
 
     now = pd.Timestamp.now()
-    time_id = slugify(now.isoformat(), lowercase=False)
+    time_id = render_timestamp_slug(now)
     # Assume that transcripts won't change and are "pure functions", unlike LLM outputs.
     transcript_output_dir_path = Path("generated") / "transcript_output"  # / time_id
     llm_output_dir_path = Path("generated") / "llm_output" / time_id
@@ -48,9 +53,10 @@ def main():
         if skip > idx:
             continue
 
+        # TODO eschalk read from metadata_output if missing?
         title = str(video_to_summarize["title"])
         href = str(video_to_summarize["href"])
-        video_id = str(video_to_summarize["id"])
+        video_id = str(video_to_summarize["video_id"])
         timestamp = str(video_to_summarize["timestamp"])
 
         title_slug = render_title_slug(title)
@@ -84,11 +90,8 @@ def main():
                 transcript_output_dir_path,
                 llm_output_dir_path,
                 with_ai_summary,
+                now,
             )
-
-
-def render_title_slug(title: str) -> str:
-    return slugify(title) or "untitled"
 
 
 def handle_video(
@@ -97,22 +100,33 @@ def handle_video(
     transcript_output_dir_path: Path,
     llm_output_dir_path: Path,
     with_ai_summary: bool,
+    now: pd.Timestamp,
 ) -> None:
-    href = "https://www.youtube.com/watch?v=" + video_id
+    video_url = render_video_url(video_id)
     title_slug = render_title_slug(title)
     transcript_output_file_paths = sorted(
         transcript_output_dir_path.glob(f"*{video_id}*")
     )
 
     if not transcript_output_file_paths:
-        result = get_youtube_transcript(href, preferred_languages=("fr", "en"))
+        result = get_youtube_transcript(video_url, preferred_languages=("fr", "en"))
         if isinstance(result, TranscriptSuccessResult):
             transcript_output_file_path = (
-                transcript_output_dir_path / result.generate_path(title_slug)
+                transcript_output_dir_path
+                / result.generate_transcript_filename(title_slug)
             )
             transcript_output_file_path.parent.mkdir(exist_ok=True, parents=True)
+            # additional_metadata = YouTubeHtmlScrapper.from_url(video_url).to_dict()
+
+            additional_metadata = {"creation_date": now.isoformat()}
             transcript_output_file_path.write_text(
-                json.dumps(result.to_json_serializable(), indent=4)
+                json.dumps(
+                    result.to_json_serializable(
+                        additional_metadata=additional_metadata
+                    ),
+                    ensure_ascii=False,
+                    indent=4,
+                )
             )
             print(
                 f"[  OK] Written summary for [[{title}]] into {transcript_output_file_path}"
@@ -146,7 +160,7 @@ def handle_video(
         prompt = available_prompts["prompts"]["user"]["basic"]
         assistant_content = available_prompts["prompts"]["assistant"]["basic"]
 
-        print(f"Generating summary for video: {href}")
+        print(f"Generating summary for video: {video_url}")
         response = proxy.prompt(
             prompt.format(transcript=transcript_full_text), assistant_content
         )

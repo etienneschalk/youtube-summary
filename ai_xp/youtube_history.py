@@ -6,9 +6,9 @@ from typing import Any, Self
 import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
-from slugify import slugify
 
 from ai_xp.transcript import extract_video_id
+from ai_xp.utils import render_title_slug, render_video_url
 
 path = Path(
     "/home/tselano/Downloads/takeout-20250416T125258Z-001/Takeout/YouTube et YouTube Music/historique/watch-history.json"
@@ -119,12 +119,14 @@ class YouTubeHistoryAnalyzer:
                     # Note: the prefix before the title must be found for all languages.
                     # If it is not french, the prefix will just be kept
                     entry["title"] = (
-                        entry["title"].lstrip("Vous avez regardé ").lstrip("consulté ")
+                        entry["title"]
+                        .removeprefix("Vous avez regardé ")
+                        .removeprefix("consulté ")
                     )
                 else:
                     # Do nothing, the prefix will remain
                     pass
-                entry["title_slug"] = slugify(entry["title"]) or "untitled"
+                entry["title_slug"] = render_title_slug(entry["title"])
                 if "titleUrl" in entry:
                     if (
                         entry["titleUrl"].startswith("https://www.youtube.com/playlist")
@@ -136,8 +138,8 @@ class YouTubeHistoryAnalyzer:
 
                     identifier = extract_video_id(entry["titleUrl"])
                     if identifier:
-                        entry["id"] = identifier
-                        entry["href"] = "https://www.youtube.com/watch?v=" + identifier
+                        entry["video_id"] = identifier
+                        entry["href"] = render_video_url(identifier)
 
                     filtered_raw_history_json.append(entry)
 
