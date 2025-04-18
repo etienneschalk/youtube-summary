@@ -95,7 +95,8 @@ class TranscriptSuccessResult:
 
 @dataclass(kw_only=True, frozen=True)
 class TranscriptErrorResult:
-    error: YouTubeTranscriptApiException
+    error: Exception
+    # error: YouTubeTranscriptApiException
     video_id: str
 
     def to_json(self) -> str:
@@ -137,6 +138,9 @@ def get_youtube_transcript(
         ).fetch()
         return TranscriptSuccessResult(transcript=transcript)
     except YouTubeTranscriptApiException as error:
+        print(f"Error fetching transcript: {type(error).__name__}")
+        return TranscriptErrorResult(error=error, video_id=video_id)
+    except TypeError as error:
         print(f"Error fetching transcript: {type(error).__name__}")
         return TranscriptErrorResult(error=error, video_id=video_id)
 

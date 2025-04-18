@@ -8,7 +8,7 @@ import xarray as xr
 from matplotlib import pyplot as plt
 
 from ai_xp.transcript import extract_video_id
-from ai_xp.utils import render_title_slug, render_video_url
+from ai_xp.utils import render_video_url
 
 path = Path(
     "/home/tselano/Downloads/takeout-20250416T125258Z-001/Takeout/YouTube et YouTube Music/historique/watch-history.json"
@@ -126,7 +126,6 @@ class YouTubeHistoryAnalyzer:
                 else:
                     # Do nothing, the prefix will remain
                     pass
-                entry["title_slug"] = render_title_slug(entry["title"])
                 if "titleUrl" in entry:
                     if (
                         entry["titleUrl"].startswith("https://www.youtube.com/playlist")
