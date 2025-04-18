@@ -1,11 +1,12 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from time import sleep
 from typing import Self
 
 import pandas as pd
 
-from ai_xp.scrapper import MetadataPath
+from ai_xp.scrapper import MetadataPath, YouTubeHtmlScrapper
 from ai_xp.transcript import TranscriptPath, extract_video_id
 from ai_xp.utils import render_title_slug
 from ai_xp.youtube_history import YouTubeHistoryAnalyzer
@@ -145,6 +146,39 @@ class FileDatabase:
             errors_df["exc_name"] = split_df["exc_name"]
         errors_df = errors_df.set_index(["timestamp", "title_slug"])
         return errors_df
+
+    def fetch_metadata(self, *, sleep_seconds: int = 2):
+        self.metadata_lookup_dir_path.mkdir(exist_ok=True, parents=True)
+        missing_metadata = self.inputs_with_missing_metadata()
+        print("Start metadata fetching ")
+        print(f"There is {len(self.input_dataframe)} inputs. ")
+        print(f"There is {len(missing_metadata)} missing metadata files. ")
+        for idx, video_id in enumerate(missing_metadata.index, 1):
+            print(f"{idx}/{len(missing_metadata)}: {video_id}")
+            scrapper = YouTubeHtmlScrapper.from_video_id(video_id)
+            if scrapper is None:
+                print(f"ERROR Failed to fetch metadata for {video_id}")
+            else:
+                metadata_parsed_path = MetadataPath.from_scrapper(scrapper, "json")
+                output_filename = metadata_parsed_path.to_filename()
+                output_path = self.metadata_lookup_dir_path / output_filename
+                if metadata_parsed_path.status == "success":
+                    output_path.write_text(scrapper.to_json())
+                elif metadata_parsed_path.status == "likely-video-unavailable":
+                    message = (
+                        "ERROR Cannot extract description, video likely unavailable"
+                    )
+                    print(message)
+                    output_path.write_text(json.dumps({"error": message}))
+                elif metadata_parsed_path.status == "likely-an-advertisement":
+                    message = "ERROR JSON cannot be parsed (Regexp can). Empirically, likely an ad."
+                    print(message)
+                    output_path.write_text(json.dumps({"error": message}))
+                print(f"OK Written {video_id} metadata to {output_path} ")
+                print(f"status ({metadata_parsed_path.status})")
+
+            print(f"Sleep for {sleep_seconds} seconds...")
+            sleep(sleep_seconds)
 
 
 def inputs_dir_to_dataframe(input_lookup_dir_path: Path) -> pd.DataFrame:

@@ -39,10 +39,11 @@ class YouTubeHtmlScrapper:
             return None
 
         soup = BeautifulSoup(response.text, features="html.parser")
-        return cls(soup=soup, url=url)
+        instance = cls(soup=soup, url=url)
+        return instance
 
     def title(self) -> str:
-        return str(self.soup.title.text).rstrip(" - YouTube")
+        return str(self.soup.title.text).removesuffix(" - YouTube")
 
     def short_description(self, *, mode: Literal["json", "regex"] = "json") -> str:
         script_text = self.soup.body.script.text.replace("\n", "")
@@ -51,7 +52,9 @@ class YouTubeHtmlScrapper:
             return self.try_to_extract_short_description_with_regex(script_text)
         elif mode == "json":
             # Only works when fetching the HTML automatically, not manually from source.
-            obj = json.loads(script_text.lstrip("var ytInitialPlayerResponse = ")[:-1])
+            obj = json.loads(
+                script_text.removeprefix("var ytInitialPlayerResponse = ")[:-1]
+            )
             return obj["videoDetails"]["shortDescription"]
 
         raise NotImplementedError
@@ -82,12 +85,15 @@ class YouTubeHtmlScrapper:
 class MetadataPath:
     video_id: str
     title_slug: str
+    status: str
     extension: str
 
     @classmethod
     def from_path(cls, path: Path | str) -> Self:
-        video_id, title_slug, extension = Path(path).name.split(".", maxsplit=3)
-        return cls(video_id=video_id, title_slug=title_slug, extension=extension)
+        video_id, title_slug, status, extension = Path(path).name.split(".", maxsplit=4)
+        return cls(
+            video_id=video_id, title_slug=title_slug, status=status, extension=extension
+        )
 
     @classmethod
     def from_scrapper(
@@ -95,17 +101,41 @@ class MetadataPath:
         scrapper: YouTubeHtmlScrapper,
         extension: str,
     ) -> Self:
-        title_slug = render_title_slug(scrapper.title())
         video_id = extract_video_id(scrapper.url)
         if not video_id:
+            # This should not happen, the error cannot even be loged.
             raise ValueError
-        return cls(video_id=video_id, title_slug=title_slug, extension=extension)
+        try:
+            scrapper.short_description()
+        except KeyError:
+            return cls(
+                video_id=video_id,
+                title_slug="no_slug",
+                status="likely-video-unavailable",
+                extension=extension,
+            )
+        except json.decoder.JSONDecodeError:
+            return cls(
+                video_id=video_id,
+                title_slug="no_slug",
+                status="likely-an-advertisement",
+                extension=extension,
+            )
+
+        title_slug = render_title_slug(scrapper.title())
+        return cls(
+            video_id=video_id,
+            title_slug=title_slug,
+            status="success",
+            extension=extension,
+        )
 
     def to_filename(self) -> str:
         return ".".join(
             (
                 self.video_id,
                 self.title_slug,
+                self.status,
                 self.extension,
             )
         )
