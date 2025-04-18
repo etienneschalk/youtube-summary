@@ -7,8 +7,12 @@ from typing import Self
 import pandas as pd
 
 from ai_xp.scrapper import MetadataPath, YouTubeHtmlScrapper
-from ai_xp.transcript import TranscriptPath, extract_video_id
-from ai_xp.utils import render_title_slug
+from ai_xp.transcript import (
+    TranscriptPath,
+    extract_video_id,
+    get_youtube_transcript,
+)
+from ai_xp.utils import render_title_slug, render_video_url
 from ai_xp.youtube_history import YouTubeHistoryAnalyzer
 
 
@@ -148,6 +152,11 @@ class FileDatabase:
         return errors_df
 
     def fetch_metadata(self, *, sleep_seconds: int = 2):
+        # Note: no retry mechanism implemented.
+        # If a fetch resulted in error, it will not be retried.
+        # For advertisements or videos unavailable, this is OK
+        # But for some other errors, it might be beneficial
+        # to retry a video.
         self.metadata_lookup_dir_path.mkdir(exist_ok=True, parents=True)
         missing_metadata = self.inputs_with_missing_metadata()
         print("Start metadata fetching ")
@@ -177,6 +186,36 @@ class FileDatabase:
                 print(f"OK Written {video_id} metadata to {output_path} ")
                 print(f"status ({metadata_parsed_path.status})")
 
+            print(f"Sleep for {sleep_seconds} seconds...")
+            sleep(sleep_seconds)
+
+    def fetch_transcripts(self, *, sleep_seconds: int = 2):
+        # Note: no retry mechanism implemented.
+        # If a fetch resulted in error, it will not be retried.
+        # For advertisements or videos unavailable, this is OK
+        # But for some other errors, it might be beneficial
+        # to retry a video.
+        self.transcript_lookup_dir_path.mkdir(exist_ok=True, parents=True)
+        missing_transcripts = self.inputs_with_missing_transcripts()
+        print("Start transcripts fetching ")
+        print(f"There is {len(self.input_dataframe)} inputs. ")
+        print(f"There is {len(missing_transcripts)} missing transcripts files. ")
+        for idx, video_id in enumerate(missing_transcripts.index, 1):
+            print(f"{idx}/{len(missing_transcripts)}: {video_id}")
+            video_url = render_video_url(video_id)
+            result = get_youtube_transcript(video_url, preferred_languages=("fr", "en"))
+            title = str(missing_transcripts.loc[video_id]["title"])
+            title_slug = render_title_slug(title)
+            transcript_parsed_name = result.generate_transcript_parsed_name(title_slug)
+            transcript_output_file_path = (
+                self.transcript_lookup_dir_path / transcript_parsed_name.to_filename()
+            )
+            transcript_output_file_path.parent.mkdir(exist_ok=True, parents=True)
+            transcript_output_file_path.write_text(result.to_json())
+            print(
+                f"[  OK] Written summary for [[{title}]] into {transcript_output_file_path}"
+            )
+            print(f"status ({transcript_parsed_name.status})")
             print(f"Sleep for {sleep_seconds} seconds...")
             sleep(sleep_seconds)
 

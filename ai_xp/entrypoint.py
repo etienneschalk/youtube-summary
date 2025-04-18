@@ -113,11 +113,9 @@ def handle_video(
         if isinstance(result, TranscriptSuccessResult):
             transcript_output_file_path = (
                 transcript_output_dir_path
-                / result.generate_transcript_filename(title_slug)
+                / result.generate_transcript_parsed_name(title_slug)
             )
             transcript_output_file_path.parent.mkdir(exist_ok=True, parents=True)
-            # additional_metadata = YouTubeHtmlScrapper.from_url(video_url).to_dict()
-
             additional_metadata = {"creation_date": now.isoformat()}
             transcript_output_file_path.write_text(
                 json.dumps(
@@ -135,8 +133,9 @@ def handle_video(
         else:
             exc_name = type(result.error).__name__
             summary = f"<<<ERROR>>>: {exc_name}\n{str(result.error)}"
-            error_output_file_path = llm_output_dir_path.with_suffix(
-                f".{exc_name}.err.md"
+            error_output_file_path = (
+                transcript_output_dir_path
+                / result.generate_transcript_filename(title_slug)
             )
             error_output_file_path.write_text(summary)
             print(f"[ NOK] Written [[{title}]] into {error_output_file_path}")

@@ -1,3 +1,4 @@
+import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Self
@@ -15,18 +16,20 @@ class TranscriptPath:
     source: str
     video_id: str
     title_slug: str
+    status: str
     extension: str
 
     @classmethod
     def from_path(cls, path: Path | str) -> Self:
-        language_code, source, video_id, title_slug, extension = Path(path).name.split(
-            ".", maxsplit=5
-        )
+        language_code, source, video_id, title_slug, status, extension = Path(
+            path
+        ).name.split(".", maxsplit=6)
         return cls(
             language_code=language_code,
             source=source,
             video_id=video_id,
             title_slug=title_slug,
+            status=status,
             extension=extension,
         )
 
@@ -40,6 +43,7 @@ class TranscriptPath:
             source=source,
             video_id=transcript.video_id,
             title_slug=title_slug,
+            status="success",
             extension=extension,
         )
 
@@ -50,6 +54,7 @@ class TranscriptPath:
                 self.source,
                 self.video_id,
                 self.title_slug,
+                self.status,
                 self.extension,
             )
         )
@@ -71,7 +76,7 @@ class TranscriptSuccessResult:
         return "\n".join([entry["text"] for entry in self.transcript.to_raw_data()])  # type: ignore
 
     def to_json_serializable(
-        self, *, additional_metadata: dict[str, str] | None
+        self, *, additional_metadata: dict[str, str] | None = None
     ) -> dict[str, Any]:
         data = {k: v for k, v in self.transcript.__dict__.items()}
         data["snippets"] = self.transcript.to_raw_data()
@@ -79,15 +84,36 @@ class TranscriptSuccessResult:
             data["metadata"] = additional_metadata
         return data
 
-    def generate_transcript_filename(self, title_slug: str) -> str:
+    def to_json(self) -> str:
+        return json.dumps(self.to_json_serializable(), ensure_ascii=False, indent=4)
+
+    def generate_transcript_parsed_name(self, title_slug: str) -> TranscriptPath:
         return TranscriptPath.from_transcript(
             transcript=self.transcript, title_slug=title_slug, extension="json"
-        ).to_filename()
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
 class TranscriptErrorResult:
     error: YouTubeTranscriptApiException
+    video_id: str
+
+    def to_json(self) -> str:
+        exc_name = type(self.error).__name__
+        summary = str(self.error)
+        obj = {"error": {"exc_name": exc_name, "summary": summary}}
+        return json.dumps(obj, ensure_ascii=False, indent=4)
+
+    def generate_transcript_parsed_name(self, title_slug: str) -> TranscriptPath:
+        exc_name = type(self.error).__name__
+        return TranscriptPath(
+            language_code="_",
+            source="_",
+            video_id=self.video_id,
+            title_slug=title_slug,
+            status=exc_name,
+            extension="json",
+        )
 
 
 def get_youtube_transcript(
@@ -101,6 +127,9 @@ def get_youtube_transcript(
         else (preferred_languages,)
     )
     video_id = extract_video_id(video_url)
+    if not video_id:
+        # This should not happen, the error cannot even be logged.
+        raise ValueError
     try:
         # Try preferred language. If the language is not available this will fail.
         transcript = get_youtube_transcript_internal(
@@ -109,7 +138,7 @@ def get_youtube_transcript(
         return TranscriptSuccessResult(transcript=transcript)
     except YouTubeTranscriptApiException as error:
         print(f"Error fetching transcript: {type(error).__name__}")
-        return TranscriptErrorResult(error=error)
+        return TranscriptErrorResult(error=error, video_id=video_id)
 
 
 def get_youtube_transcript_internal(

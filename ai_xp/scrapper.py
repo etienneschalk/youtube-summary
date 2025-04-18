@@ -75,9 +75,7 @@ class YouTubeHtmlScrapper:
     def to_dict(self, *, mode: Literal["json", "regex"] = "json") -> dict[str, str]:
         return {"title": self.title(), "description": self.short_description(mode=mode)}
 
-    def to_json(self, *, mode: Literal["json", "regex"] = "json"):
-        import json
-
+    def to_json(self, *, mode: Literal["json", "regex"] = "json") -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
 
@@ -103,7 +101,7 @@ class MetadataPath:
     ) -> Self:
         video_id = extract_video_id(scrapper.url)
         if not video_id:
-            # This should not happen, the error cannot even be loged.
+            # This should not happen, the error cannot even be logged.
             raise ValueError
         try:
             scrapper.short_description()
