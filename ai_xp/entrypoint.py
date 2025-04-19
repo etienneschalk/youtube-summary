@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 
 from ai_xp.database import FileDatabase
-from ai_xp.llm_proxy import OpenRouterAiProxy
 from ai_xp.transcript import (
     TranscriptSuccessResult,
     get_youtube_transcript,
@@ -13,7 +12,6 @@ from ai_xp.utils import (
     render_timestamp_slug,
     render_title_slug,
     render_video_url,
-    retrieve_api_key,
 )
 
 
@@ -138,16 +136,7 @@ def handle_video(
 
     transcript_output_file_path = transcript_output_file_paths[0]
     if with_ai_summary:
-        # Re-read from file
-        api_key = retrieve_api_key()
-        proxy = OpenRouterAiProxy(api_key=api_key)
-        summarize_with_ai(
-            proxy,
-            title,
-            video_url,
-            transcript_output_file_path,
-            llm_output_dir_path,
-        )
+        raise NotImplementedError("Check database.py")
 
 
 def is_unrecoverable_error(exc_name: str) -> bool:
