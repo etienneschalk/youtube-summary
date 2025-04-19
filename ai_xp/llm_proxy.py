@@ -1,18 +1,55 @@
 import json
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
+import pandas as pd
 import requests
 
-from ai_xp.transcript import load_transcript_full_text
-from ai_xp.utils import load_toml, render_title_slug, render_video_url
+from ai_xp.transcript import TranscriptPath, load_transcript_full_text
+from ai_xp.utils import (
+    load_toml,
+    render_timestamp_slug,
+    render_title_slug,
+    render_video_url,
+)
 
-PromptsDictType = dict[Literal["user", "assistant"], str]
+PromptsDictType = dict[Literal["user", "assistant", "family"], str]
 
 
 class OpenRouterRateLimitExceeded(Exception):
     pass
+
+
+@dataclass(frozen=True, kw_only=True)
+class AiSummaryPath:
+    prompt_family: str
+    transcript_path_suffix: TranscriptPath
+
+    @classmethod
+    def from_transcript_path(
+        cls, prompt_family: str, transcript_path_suffix: TranscriptPath
+    ) -> Self:
+        return cls(
+            prompt_family=prompt_family,
+            transcript_path_suffix=transcript_path_suffix,
+        )
+
+    @classmethod
+    def from_path(cls, path: Path | str) -> Self:
+        path = Path(path)
+        prompt_family, suffix = path.name.split(".", maxsplit=1)
+        transcript_path_suffix = TranscriptPath.from_path(suffix)
+        return cls.from_transcript_path(prompt_family, transcript_path_suffix)
+
+    def to_filename(self) -> str:
+        return ".".join(
+            (
+                self.prompt_family,
+                self.transcript_path_suffix.to_filename(),
+            )
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -77,15 +114,28 @@ class VideoModel:
 class AiSummarizer:
     proxy: OpenRouterAiProxy
     all_prompts: dict[str, dict[str, PromptsDictType]]
+    dry_run: bool
+    creation_time: pd.Timestamp | None
+
+    @cached_property
+    def time_id(self) -> str | None:
+        return render_timestamp_slug(self.creation_time) if self.creation_time else None
 
     @classmethod
     def instantiate(
         cls,
         proxy: OpenRouterAiProxy,
+        dry_run: bool = False,
         prompts_path: Path = Path("resources/prompts/prompts.toml"),
+        creation_time: pd.Timestamp | None = None,
     ):
         all_prompts = load_toml(prompts_path)["prompts"]
-        return cls(proxy=proxy, all_prompts=all_prompts)
+        return cls(
+            proxy=proxy,
+            all_prompts=all_prompts,
+            dry_run=dry_run,
+            creation_time=creation_time,
+        )
 
     def summarize_with_ai(
         self,
@@ -124,6 +174,7 @@ class AiSummarizer:
             prompts = {
                 "user": prompts["user"].format(video_transcript=transcript_full_text),
                 "assistant": prompts["assistant"],
+                "family": prompt_family,
             }
             return prompts
 
@@ -135,6 +186,7 @@ class AiSummarizer:
                     video_description=video.description,
                 ),
                 "assistant": prompts["assistant"],
+                "family": prompt_family,
             }
             return prompts
 
@@ -146,6 +198,27 @@ class AiSummarizer:
         transcript_file_path: Path,
         llm_output_dir_path: Path,
     ) -> None:
+        parsed_transcript_path = TranscriptPath.from_path(
+            transcript_file_path.with_suffix(".md")
+        )
+        parsed_ai_summary_path = AiSummaryPath.from_transcript_path(
+            prompts["family"], parsed_transcript_path
+        )
+
+        # Output the result into a time-identified subfolder.
+        if self.time_id:
+            llm_output_dir_path /= self.time_id
+
+        llm_output_file_path = (
+            llm_output_dir_path / parsed_ai_summary_path.to_filename()
+        )
+
+        if self.dry_run:
+            print(
+                f"[  OK] (DRY RUN) Would have written summary for {transcript_file_path} into {llm_output_file_path}"
+            )
+            return
+
         response = self.proxy.prompt(prompts)
         if "error" in response:
             print(json.dumps(response, indent=4))
@@ -154,9 +227,7 @@ class AiSummarizer:
             raise OpenRouterRateLimitExceeded(response["error"]["message"])
         else:
             summary = response["choices"][0]["message"]["content"]
-            llm_output_file_path = (
-                llm_output_dir_path / transcript_file_path.with_suffix(".md")
-            )
+            llm_output_file_path.parent.mkdir(exist_ok=True, parents=True)
             llm_output_file_path.write_text(summary)
             print(
                 f"[  OK] Written summary for {transcript_file_path} into {llm_output_file_path}"
