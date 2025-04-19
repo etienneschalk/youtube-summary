@@ -1,11 +1,12 @@
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import pandas as pd
 import requests
+import tomli_w
 
 from ai_xp.scrapper import MetadataPath
 from ai_xp.transcript import TranscriptPath, load_transcript_full_text
@@ -17,7 +18,7 @@ from ai_xp.utils import (
     render_video_url,
 )
 
-PromptsDictType = dict[Literal["user", "assistant", "family"], str]
+PromptsDictType = dict[Literal["user", "assistant", "_family"], str]
 
 
 class OpenRouterRateLimitExceeded(Exception):
@@ -66,6 +67,7 @@ class OpenRouterAiProxy:
     # model: str = "deepseek/deepseek-chat-v3-0324:free"
     # model: str = "google/gemini-2.5-pro-exp-03-25:free"
     model: str = "deepseek/deepseek-r1:free"
+    endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
 
     def prompt(self, prompts: PromptsDictType):
         user_content = prompts["user"]
@@ -79,21 +81,17 @@ class OpenRouterAiProxy:
                 {"role": "assistant", "content": assistant_content},
             )
 
+        request_data = {"model": self.model, "messages": messages}
         response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
+            url=self.endpoint,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            data=json.dumps(
-                {
-                    "model": self.model,
-                    "messages": messages,
-                }
-            ),
+            data=json.dumps(request_data),
         )
         response_dict = json.loads(response.content.decode())
-        return response_dict
+        return {"request": {"data": request_data}, "response": response_dict}
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -193,7 +191,7 @@ class AiSummarizer:
             prompts = {
                 "user": prompts["user"].format(video_transcript=transcript_full_text),
                 "assistant": prompts["assistant"],
-                "family": prompt_family,
+                "_family": prompt_family,
             }
             return prompts
 
@@ -205,7 +203,7 @@ class AiSummarizer:
                     video_description=video.description,
                 ),
                 "assistant": prompts["assistant"],
-                "family": prompt_family,
+                "_family": prompt_family,
             }
             return prompts
 
@@ -221,7 +219,7 @@ class AiSummarizer:
             transcript_file_path.with_suffix(".md")
         )
         parsed_ai_summary_path = AiSummaryPath.from_transcript_path(
-            prompts["family"], parsed_transcript_path
+            prompts["_family"], parsed_transcript_path
         )
 
         # Output the result into a time-identified subfolder.
@@ -238,7 +236,17 @@ class AiSummarizer:
             )
             return
 
-        response = self.proxy.prompt(prompts)
+        result = self.proxy.prompt(prompts)
+        metadata = {
+            "url": self.proxy.endpoint,
+            "model": self.proxy.model,
+            "creation_time": (
+                self.creation_time.isoformat() if self.creation_time else None
+            ),
+            "prompts": prompts,
+            "result": result,
+        }
+        response = result["response"]
         if "error" in response:
             print(json.dumps(response, indent=4))
             print(response["error"]["message"])
@@ -247,7 +255,7 @@ class AiSummarizer:
         else:
             summary = response["choices"][0]["message"]["content"]
             llm_output_file_path.parent.mkdir(exist_ok=True, parents=True)
-            llm_output_file_path.write_text(summary)
+            llm_output_file_path.write_text(render_llm_output_file(metadata, summary))
             print(
                 f"[  OK] Written summary for {transcript_file_path} into {llm_output_file_path}"
             )
@@ -257,3 +265,46 @@ class AiSummarizer:
     ) -> PromptsDictType:
         prompts = self.all_prompts[prompt_family][prompt_language_code]
         return prompts
+
+
+def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
+    return f"""
+{summary}
+
+<!-- METADATA START -->
+
+---
+
+<details> <summary> Metadata (TOML) </summary>
+
+```toml
+{tomli_w.dumps(metadata, multiline_strings=True)}
+```
+</details>
+"""
+
+
+# def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
+#     return f"""
+# {summary}
+
+# <!-- METADATA START -->
+
+# ---
+
+# <details> <summary> Metadata (JSON) </summary>
+
+# ```json
+# {json.dumps(metadata, sort_keys=True, indent=4, ensure_ascii=False)}
+# ```
+# </details>
+
+# ---
+
+# <details> <summary> Metadata (TOML) </summary>
+
+# ```toml
+# {tomli_w.dumps(metadata, multiline_strings=True)}
+# ```
+# </details>
+# """

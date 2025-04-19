@@ -6,15 +6,32 @@ from typing import Self
 
 import pandas as pd
 
-from ai_xp.llm_proxy import AiSummaryPath
+from ai_xp.llm_proxy import AiSummarizer, AiSummaryPath, OpenRouterAiProxy, VideoModel
 from ai_xp.scrapper import MetadataPath, YouTubeHtmlScrapper
-from ai_xp.transcript import (
-    TranscriptPath,
-    extract_video_id,
-    get_youtube_transcript,
-)
-from ai_xp.utils import load_json, render_title_slug, render_video_url
+from ai_xp.transcript import TranscriptPath, extract_video_id, get_youtube_transcript
+from ai_xp.utils import load_json, render_title_slug, render_video_url, retrieve_api_key
 from ai_xp.youtube_history import YouTubeHistoryAnalyzer
+
+
+@dataclass(kw_only=True, frozen=True)
+class OutputCandidateRow:
+    video_id: str
+    title: str
+    metadata_status: str
+    transcript_status: str
+    metadata_path: Path
+    transcript_path: Path
+
+    @classmethod
+    def from_series(cls, series: pd.Series) -> Self:
+        return cls(
+            video_id=str(series.name),
+            title=series["title"],
+            metadata_status=series["metadata_status"],
+            transcript_status=series["transcript_status"],
+            metadata_path=series["metadata_path"],
+            transcript_path=series["transcript_path"],
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -236,6 +253,44 @@ class FileDatabase:
             # Drop error-couples (for error, no transcript-related index values exist)
             .drop(("_", "_"))
         )
+
+    def fetch_missing_llm_outputs(self):
+        now = pd.Timestamp.now()
+
+        # TODO eschalk Make that configurable
+        prompts_path = Path("../resources/prompts/prompts.toml")
+        secrets_path = Path.home() / Path(".secrets/yt_summary_secrets.json")
+
+        api_key = retrieve_api_key(secrets_path=secrets_path)
+        proxy = OpenRouterAiProxy(api_key=api_key)
+        summarizer = AiSummarizer.instantiate(
+            proxy, dry_run=False, prompts_path=prompts_path, creation_time=now
+        )
+        print(summarizer)
+
+        indexers = self.get_transcript_language_and_source_indexer_couples()
+        dfs = self.find_missing_llm_outputs_candidates(
+            indexers, keep_successful_only=True
+        )
+        for key in dfs:
+            language_code, source = key
+            print(language_code, source)
+            df = dfs[key]
+
+            for idx, video_id in enumerate(df.index, 1):
+                row_model = OutputCandidateRow.from_series(df.loc[video_id])
+                print(f"{idx:05d}/{len(df):05d}", video_id, row_model.title)
+                print(f"{row_model.metadata_path=}")
+                print(f"{row_model.transcript_path=}")
+                video = VideoModel.from_path(Path(row_model.metadata_path))
+                print(video)
+                summarizer.summarize_with_ai(
+                    video,
+                    Path(row_model.transcript_path),
+                    self.llm_output_lookup_dir_path,
+                    language_code,
+                    None,
+                )
 
 
 def inputs_dir_to_dataframe(input_lookup_dir_path: Path) -> pd.DataFrame:

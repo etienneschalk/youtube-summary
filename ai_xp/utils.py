@@ -23,7 +23,7 @@ def train_case_string(input_string: str) -> str:
 
 
 def retrieve_api_key(
-    *, secrets_path: Path = Path.home() / Path(".secrets/secrets.json")
+    *, secrets_path: Path = Path.home() / Path(".secrets/yt_summary_secrets.json")
 ):
     if secrets_path.is_file():
         return load_json(secrets_path)["openrouter.ai"]["api-key"]

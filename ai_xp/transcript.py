@@ -67,7 +67,7 @@ class TranscriptPath:
 
 def load_transcript_full_text(transcript_output_file_path: Path) -> str:
     # Load a JSON-serialized transcript.
-    transcript_full_text = " ".join(
+    transcript_full_text = "\n".join(
         line["text"] for line in load_json(transcript_output_file_path)["snippets"]
     )
     return transcript_full_text
