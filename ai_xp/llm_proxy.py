@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from pathlib import Path
 from typing import Literal, Self
@@ -7,8 +7,10 @@ from typing import Literal, Self
 import pandas as pd
 import requests
 
+from ai_xp.scrapper import MetadataPath
 from ai_xp.transcript import TranscriptPath, load_transcript_full_text
 from ai_xp.utils import (
+    load_json,
     load_toml,
     render_timestamp_slug,
     render_title_slug,
@@ -50,6 +52,12 @@ class AiSummaryPath:
                 self.transcript_path_suffix.to_filename(),
             )
         )
+
+    def asdict(self) -> dict[str, str]:
+        return {
+            "prompt_family": self.prompt_family,
+            **self.transcript_path_suffix.asdict(),
+        }
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -108,6 +116,17 @@ class VideoModel:
             return "basic_with_context"
         else:
             return "basic"
+
+    @classmethod
+    def from_path(cls, metadata_path: Path) -> Self:
+        # Extract video_id from path itself.
+        # Extract title and description from loaded JSON.
+        metadata_json = load_json(Path(metadata_path))
+        return cls(
+            video_id=MetadataPath.from_path(metadata_path).video_id,
+            title=metadata_json["title"],
+            description=metadata_json["description"],
+        )
 
 
 @dataclass(kw_only=True, frozen=True)

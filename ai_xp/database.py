@@ -6,6 +6,7 @@ from typing import Self
 
 import pandas as pd
 
+from ai_xp.llm_proxy import AiSummaryPath
 from ai_xp.scrapper import MetadataPath, YouTubeHtmlScrapper
 from ai_xp.transcript import (
     TranscriptPath,
@@ -95,7 +96,7 @@ class FileDatabase:
         return df
 
     def inputs_with_missing_transcripts(
-        self, indexer: list[str] | None = None
+        self, indexer: (list[str] | pd.MultiIndex | None) = None
     ) -> pd.DataFrame:
         indexer = indexer or []
         # The composite key is (language_code, source, video_id)
@@ -188,25 +189,31 @@ class FileDatabase:
         print(f"status ({transcript_parsed_name.status})")
 
     def find_missing_llm_outputs_candidates(
-        self, indexers: list[tuple[str, str]], *, keep_successful_only: bool
+        self,
+        indexers: list[tuple[str, str]] | pd.MultiIndex,
+        *,
+        keep_successful_only: bool,
     ) -> dict[tuple[str, str], pd.DataFrame]:
         db = self
         dfs = {}
         for indexer in indexers:
             # Preselect transcripts for a (language_code, source) couple.
             transcripts = db.transcript_dataframe.loc[indexer]
-            # Get video ids for which both metadata and transcripts are available
-            video_ids = db.metadata_dataframe.index.intersection(
-                transcripts.index.get_level_values("video_id")
+            video_ids = (
+                # Intersect video ids for which both metadata and transcripts are available
+                db.metadata_dataframe.index.intersection(
+                    transcripts.index.get_level_values("video_id")
+                )
+                # Drop already found LLM outputs
+                .drop(
+                    db.llm_output_dataframe.index.get_level_values("video_id"),
+                    # Ignore missing video ids
+                    errors="ignore",
+                )
             )
 
-            # Drop already found LLM outputs
-            df = db.input_dataframe.drop(
-                db.llm_output_dataframe
-                # .loc[indexer]
-                # # TODO eschalk LLM outputs will follow the transcript structure (localized)
-                .index
-            ).loc[video_ids]
+            # Loc missing LLM output candidates
+            df = db.input_dataframe.loc[video_ids]
             df["metadata_status"] = db.metadata_dataframe.loc[video_ids][["status"]]
             df["transcript_status"] = transcripts.loc[video_ids][["status"]]
             df["metadata_path"] = db.metadata_dataframe.loc[video_ids][["path"]]
@@ -221,6 +228,14 @@ class FileDatabase:
 
             dfs[indexer] = df
         return dfs
+
+    def get_transcript_language_and_source_indexer_couples(self) -> pd.MultiIndex:
+        return (
+            self.transcript_dataframe.index.droplevel("video_id")
+            .unique()
+            # Drop error-couples (for error, no transcript-related index values exist)
+            .drop(("_", "_"))
+        )
 
 
 def inputs_dir_to_dataframe(input_lookup_dir_path: Path) -> pd.DataFrame:
@@ -295,13 +310,21 @@ def consolidate_output_files(output_lookup_dir_path: Path) -> dict[str, list[Pat
 def consolidated_to_output_dataframe(
     consolidated: dict[str, list[Path]],
 ) -> pd.DataFrame:
-    # TODO eschalk analyze output LLM path
     df = pd.DataFrame(
-        [(k, vv.stem, vv) for k, v in consolidated.items() for vv in v],
-        columns=["timestamp", "video_id", "output_path"],
+        [
+            {
+                "timestamp": timestamp,
+                **AiSummaryPath.from_path(path).asdict(),
+                "path": path,
+            }
+            for timestamp, paths in consolidated.items()
+            for path in paths
+        ]
     )
     df["timestamp"] = pd.to_datetime(df["timestamp"], format="%Y-%m-%dT%H-%M-%S-%f")
-    df = df.set_index(["timestamp", "video_id"])
+    df = df.set_index(
+        ["prompt_family", "language_code", "source", "timestamp", "video_id"]
+    )
 
     return df
 
