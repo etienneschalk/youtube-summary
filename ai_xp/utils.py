@@ -26,20 +26,25 @@ def retrieve_api_key(
     *, secrets_path: Path = Path.home() / Path(".secrets/secrets.json")
 ):
     if secrets_path.is_file():
-        return json.loads(secrets_path.read_text())["openrouter.ai"]["api-key"]
+        return load_json(secrets_path)["openrouter.ai"]["api-key"]
     else:
         raise FileNotFoundError(f"No secrets found for {secrets_path = !s}")
 
 
-def read_toml(file_path: Path) -> dict[str, Any]:
+def load_toml(file_path: Path) -> dict[str, Any]:
     """Read and parse a TOML file into a dictionary."""
     try:
-        with open(file_path, "rb") as f:
+        with open(file_path, "rb") as fp:
             import tomli
 
-            return tomli.load(f)
+            return tomli.load(fp)
     except ImportError:
         raise ImportError("Install 'tomli' first: pip install tomli")
+
+
+def load_json(file_path: Path) -> dict[str, Any]:
+    with open(file_path, "r") as fp:
+        return json.load(fp)
 
 
 def render_title_slug(title: str, *, limit: int = 128) -> str:

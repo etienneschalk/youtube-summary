@@ -10,16 +10,11 @@ from ai_xp.transcript import (
     get_youtube_transcript,
 )
 from ai_xp.utils import (
-    read_toml,
     render_timestamp_slug,
     render_title_slug,
     render_video_url,
     retrieve_api_key,
 )
-
-
-class OpenRouterRateLimitExceeded(Exception):
-    pass
 
 
 def main():
@@ -113,7 +108,7 @@ def handle_video(
         if isinstance(result, TranscriptSuccessResult):
             transcript_output_file_path = (
                 transcript_output_dir_path
-                / result.generate_transcript_parsed_name(title_slug)
+                / result.generate_transcript_parsed_name(title_slug).to_filename()
             )
             transcript_output_file_path.parent.mkdir(exist_ok=True, parents=True)
             additional_metadata = {"creation_date": now.isoformat()}
@@ -144,36 +139,15 @@ def handle_video(
     transcript_output_file_path = transcript_output_file_paths[0]
     if with_ai_summary:
         # Re-read from file
-        transcript_full_text = " ".join(
-            line["text"]
-            for line in json.loads(transcript_output_file_path.read_text())["snippets"]
-        )
-        # (language_code, transcript_source, video_id, title_slug, extension) = (
-        #     transcript_output_file_path.name.split(".")
-        # )
         api_key = retrieve_api_key()
         proxy = OpenRouterAiProxy(api_key=api_key)
-        # TODO eschalk make the prompts configurable
-        prompts_path = Path("resources/prompts/prompts.toml")
-        available_prompts = read_toml(prompts_path)
-        prompt = available_prompts["prompts"]["user"]["basic"]
-        assistant_content = available_prompts["prompts"]["assistant"]["basic"]
-
-        print(f"Generating summary for video: {video_url}")
-        response = proxy.prompt(
-            prompt.format(transcript=transcript_full_text), assistant_content
+        summarize_with_ai(
+            proxy,
+            title,
+            video_url,
+            transcript_output_file_path,
+            llm_output_dir_path,
         )
-        if "error" in response:
-            print(json.dumps(response, indent=4))
-            print(response["error"]["message"])
-            raise OpenRouterRateLimitExceeded(response["error"]["message"])
-        else:
-            summary = response["choices"][0]["message"]["content"]
-            llm_output_file_path = (
-                llm_output_dir_path / transcript_output_file_path.with_suffix(".md")
-            )
-            llm_output_file_path.write_text(summary)
-            print(f"[  OK] Written summary for [[{title}]] into {llm_output_file_path}")
 
 
 def is_unrecoverable_error(exc_name: str) -> bool:

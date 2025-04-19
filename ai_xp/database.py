@@ -12,7 +12,7 @@ from ai_xp.transcript import (
     extract_video_id,
     get_youtube_transcript,
 )
-from ai_xp.utils import render_title_slug, render_video_url
+from ai_xp.utils import load_json, render_title_slug, render_video_url
 from ai_xp.youtube_history import YouTubeHistoryAnalyzer
 
 
@@ -256,7 +256,7 @@ def llm_outputs_dir_dataframe(output_lookup_dir_path: Path) -> pd.DataFrame:
 
 def consolidate_input_json(lookup_dir_path: Path):
     all_json_paths = sorted(lookup_dir_path.glob("*.json"))
-    all_videos = [video for p in all_json_paths for video in json.loads(p.read_text())]
+    all_videos = [video for p in all_json_paths for video in load_json(p)]
 
     for video in all_videos:
         # video["title_slug"] = render_title_slug(video["title"])

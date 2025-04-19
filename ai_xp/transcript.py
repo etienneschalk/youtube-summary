@@ -9,6 +9,8 @@ from youtube_transcript_api._errors import (
     YouTubeTranscriptApiException,
 )
 
+from ai_xp.utils import load_json
+
 
 @dataclass(frozen=True, kw_only=True)
 class TranscriptPath:
@@ -61,6 +63,14 @@ class TranscriptPath:
 
     def asdict(self) -> dict[str, str]:
         return asdict(self)
+
+
+def load_transcript_full_text(transcript_output_file_path: Path) -> str:
+    # Load a JSON-serialized transcript.
+    transcript_full_text = " ".join(
+        line["text"] for line in load_json(transcript_output_file_path)["snippets"]
+    )
+    return transcript_full_text
 
 
 @dataclass(kw_only=True, frozen=True)

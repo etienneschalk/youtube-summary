@@ -1,17 +1,101 @@
-[prompts.user]
-basic = """
+[prompts.basic.fr]
+user = """
 Tu es un assistant qui synthétises les transcripts vidéo. 
 Résume les points clefs du transcript qui suit.
 Pour chaque point clef, écris une liste à puces de 3 à 5 éléments.
 Le transcript est en français et je souhaite un résumé en français.
 Voici le transcript:
 
-{transcript}
+{video_transcript}
+"""
+assistant = """
+Je dois structurer ces points de manière concise en français,
+en veillant à couvrir chaque sujet principal avec ses arguments clés et les résultats évoqués.
+L'utilisateur souhaite probablement un résumé clair et structuré, sans omission des débats ou perspectives importantes.
+Il convient d'éviter toute opinion personnelle et de s'en tenir au contenu de la transcription,
+en mettant en évidence les principales discussions, les points de vue divergents et les conclusions lorsqu'elles sont présentes.
+Il faut également noter les implications culturelles et politiques de chaque sujet, telles qu'abordées par les intervenants.
 """
 
-[prompts.assistant]
-basic = """
-I need to structure these points concisely in French,
+[prompts.basic.en]
+user = """
+You are an assistant who summarizes video transcripts.
+Summarize the key points of the following transcript.
+For each key point, write a bulleted list of 3 to 5 items.
+The transcript is in English, and I want the summary to be in English.
+Here is the transcript:
+
+{video_transcript}
+"""
+assistant = """
+I need to structure these points concisely in English,
+ensuring each major topic is covered with its key arguments and outcomes. 
+The user likely wants a clear, structured summary without missing critical debates or perspectives. 
+I should avoid personal opinions and stick to the transcript's content, 
+highlighting the main discussions, differing viewpoints, and conclusions where present. 
+Also, noting the cultural and political implications of each topic as discussed by the panelists.
+"""
+
+[prompts.basic_with_context.fr]
+user = """
+Tu es un assistant qui synthétises les transcripts vidéo. 
+Résume les points clefs du transcript qui suit.
+Pour chaque point clef, écris une liste à puces de 3 à 5 éléments.
+Le transcript est en français et je souhaite un résumé en français.
+Voici des éléments de contexte :
+
+---
+
+Voici le titre de la vidéo : {video_title}
+
+---
+
+Voici la description de la vidéo :
+
+{video_description}
+
+---
+
+Voici le transcript:
+
+{video_transcript}
+"""
+assistant = """
+Je dois structurer ces points de manière concise en français,
+en veillant à couvrir chaque sujet principal avec ses arguments clés et les résultats évoqués.
+L'utilisateur souhaite probablement un résumé clair et structuré, sans omission des débats ou perspectives importantes.
+Il convient d'éviter toute opinion personnelle et de s'en tenir au contenu de la transcription,
+en mettant en évidence les principales discussions, les points de vue divergents et les conclusions lorsqu'elles sont présentes.
+Il faut également noter les implications culturelles et politiques de chaque sujet, telles qu'abordées par les intervenants.
+"""
+
+[prompts.basic_with_context.en]
+user = """
+You are an assistant who summarizes video transcripts.
+Summarize the key points of the following transcript.
+For each key point, write a bulleted list of 3 to 5 items.
+The transcript is in English, and I want the summary to be in English.
+
+Here are elements for context:
+
+---
+
+Here is the video title : {video_title}
+
+---
+
+Here is the video description :
+
+{video_description}
+
+---
+
+Here is the transcript:
+
+{video_transcript}
+"""
+assistant = """
+I need to structure these points concisely in English,
 ensuring each major topic is covered with its key arguments and outcomes. 
 The user likely wants a clear, structured summary without missing critical debates or perspectives. 
 I should avoid personal opinions and stick to the transcript's content, 
