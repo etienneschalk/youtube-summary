@@ -260,7 +260,6 @@ class FileDatabase:
         # TODO eschalk Make that configurable
         prompts_path = Path("../resources/prompts/prompts.toml")
         secrets_path = Path.home() / Path(".secrets/yt_summary_secrets.json")
-
         api_key = retrieve_api_key(secrets_path=secrets_path)
         proxy = OpenRouterAiProxy(api_key=api_key)
         summarizer = AiSummarizer.instantiate(

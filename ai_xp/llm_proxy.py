@@ -16,6 +16,7 @@ from ai_xp.utils import (
     render_timestamp_slug,
     render_title_slug,
     render_video_url,
+    retrieve_api_key,
 )
 
 PromptsDictType = dict[Literal["user", "assistant", "_family"], str]
@@ -68,6 +69,25 @@ class OpenRouterAiProxy:
     # model: str = "google/gemini-2.5-pro-exp-03-25:free"
     model: str = "deepseek/deepseek-r1:free"
     endpoint: str = "https://openrouter.ai/api/v1/chat/completions"
+    endpoint_key_info: str = "https://openrouter.ai/api/v1/auth/key"
+
+    @classmethod
+    def instantiate_with_default_key(cls):
+        secrets_path = Path.home() / Path(".secrets/yt_summary_secrets.json")
+        api_key = retrieve_api_key(secrets_path=secrets_path)
+        proxy = OpenRouterAiProxy(api_key=api_key)
+        return proxy
+
+    def check_if_i_can_still_use_the_service(self):
+        response = requests.get(
+            url=self.endpoint_key_info,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        response_dict = json.loads(response.content.decode())
+        return response_dict
 
     def prompt(self, prompts: PromptsDictType):
         user_content = prompts["user"]
