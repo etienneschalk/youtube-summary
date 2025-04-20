@@ -2,11 +2,10 @@ import json
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
 import pandas as pd
 import requests
-import tomli_w
 
 from ai_xp.scrapper import MetadataPath
 from ai_xp.transcript import TranscriptPath, load_transcript_full_text
@@ -19,7 +18,7 @@ from ai_xp.utils import (
     retrieve_api_key,
 )
 
-PromptsDictType = dict[Literal["user", "assistant", "_family"], str]
+PromptsDictType = dict[Literal["user", "assistant"], str]
 
 
 class OpenRouterRateLimitExceeded(Exception):
@@ -111,7 +110,14 @@ class OpenRouterAiProxy:
             data=json.dumps(request_data),
         )
         response_dict = json.loads(response.content.decode())
-        return {"request": {"data": request_data}, "response": response_dict}
+        product = {
+            "url": self.endpoint,
+            "model": self.model,
+            # result's request data already contains prompts
+            "request": {"data": request_data},
+            "response": response_dict,
+        }
+        return product
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -145,6 +151,15 @@ class VideoModel:
             title=metadata_json["title"],
             description=metadata_json["description"],
         )
+
+    def asdict(self) -> dict[str, str | None]:
+        return {
+            "video_id": self.video_id,
+            "title": self.title,
+            "description": self.description,
+            "title_slug": self.title_slug,
+            "video_url": self.video_url,
+        }
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -182,23 +197,69 @@ class AiSummarizer:
         prompt_language_code: str,
         prompt_family: str | None,
     ) -> None:
+        if prompt_family is None:
+            prompt_family = video.best_prompt_family
+
         prompts = self.render_prompts(
             video, transcript_file_path, prompt_language_code, prompt_family
         )
-        print(json.dumps(prompts, indent=4, ensure_ascii=False))
-        self.prompt(prompts, transcript_file_path, llm_output_dir_path)
+        parsed_ai_summary_path = AiSummaryPath.from_transcript_path(
+            prompt_family, TranscriptPath.from_path(transcript_file_path)
+        )
+
+        # Output the result into a time-identified subfolder.
+        if self.time_id:
+            llm_output_dir_path /= self.time_id
+
+        metadata = {
+            "parsed_path": parsed_ai_summary_path.asdict(),
+            "video": video.asdict(),
+            "creation_time": (
+                self.creation_time.isoformat() if self.creation_time else None
+            ),
+        }
+
+        llm_output_file_path = (
+            llm_output_dir_path / parsed_ai_summary_path.to_filename()
+        )
+
+        if self.dry_run:
+            print(
+                f"[  OK] (DRY RUN) Would have written summary for {transcript_file_path} into {llm_output_file_path}"
+            )
+            return
+
+        product = self.proxy.prompt(prompts)
+        response = product["response"]
+
+        if "error" in response:
+            print(json.dumps(response, indent=4, ensure_ascii=False, sort_keys=True))
+            print(response["error"]["message"])
+            # TODO eschalk refine error management, it can be something else than rate limit.
+            raise OpenRouterRateLimitExceeded(response["error"]["message"])
+
+        product.update(metadata)
+
+        summary = response["choices"][0]["message"]["content"]
+
+        llm_output_file_path.parent.mkdir(exist_ok=True, parents=True)
+        md_path = llm_output_file_path.with_suffix(".md")
+        md_path.write_text(summary)
+        json_path = llm_output_file_path.with_suffix(".json")
+        json_path.write_text(
+            json.dumps(product, sort_keys=True, indent=4, ensure_ascii=False)
+        )
+        print(f"[  OK] Written product into {json_path} for {transcript_file_path}")
+        print(f"[  OK] Written md summary  into {md_path} for {transcript_file_path}")
 
     def render_prompts(
         self,
         video: VideoModel,
         transcript_file_path: Path,
         prompt_language_code: str,
-        prompt_family: str | None,
+        prompt_family: str,
     ) -> PromptsDictType:
         print(f"Generating summary for transcript: {transcript_file_path}")
-
-        if prompt_family is None:
-            prompt_family = video.best_prompt_family
 
         prompts = self.get_prompts_for_language_and_family(
             prompt_language_code, prompt_family
@@ -211,7 +272,6 @@ class AiSummarizer:
             prompts = {
                 "user": prompts["user"].format(video_transcript=transcript_full_text),
                 "assistant": prompts["assistant"],
-                "_family": prompt_family,
             }
             return prompts
 
@@ -223,62 +283,10 @@ class AiSummarizer:
                     video_description=video.description,
                 ),
                 "assistant": prompts["assistant"],
-                "_family": prompt_family,
             }
             return prompts
 
         raise ValueError("Formatting for this prompt family is not supported yet.")
-
-    def prompt(
-        self,
-        prompts: PromptsDictType,
-        transcript_file_path: Path,
-        llm_output_dir_path: Path,
-    ) -> None:
-        parsed_transcript_path = TranscriptPath.from_path(
-            transcript_file_path.with_suffix(".md")
-        )
-        parsed_ai_summary_path = AiSummaryPath.from_transcript_path(
-            prompts["_family"], parsed_transcript_path
-        )
-
-        # Output the result into a time-identified subfolder.
-        if self.time_id:
-            llm_output_dir_path /= self.time_id
-
-        llm_output_file_path = (
-            llm_output_dir_path / parsed_ai_summary_path.to_filename()
-        )
-
-        if self.dry_run:
-            print(
-                f"[  OK] (DRY RUN) Would have written summary for {transcript_file_path} into {llm_output_file_path}"
-            )
-            return
-
-        result = self.proxy.prompt(prompts)
-        metadata = {
-            "url": self.proxy.endpoint,
-            "model": self.proxy.model,
-            "creation_time": (
-                self.creation_time.isoformat() if self.creation_time else None
-            ),
-            "prompts": prompts,
-            "result": result,
-        }
-        response = result["response"]
-        if "error" in response:
-            print(json.dumps(response, indent=4))
-            print(response["error"]["message"])
-            # TODO eschalk refine error management, it can be something else than rate limit.
-            raise OpenRouterRateLimitExceeded(response["error"]["message"])
-        else:
-            summary = response["choices"][0]["message"]["content"]
-            llm_output_file_path.parent.mkdir(exist_ok=True, parents=True)
-            llm_output_file_path.write_text(render_llm_output_file(metadata, summary))
-            print(
-                f"[  OK] Written summary for {transcript_file_path} into {llm_output_file_path}"
-            )
 
     def get_prompts_for_language_and_family(
         self, prompt_language_code: str, prompt_family: str
@@ -287,21 +295,38 @@ class AiSummarizer:
         return prompts
 
 
-def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
-    return f"""
-{summary}
+# def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
+#     return f"""
+# {summary}
 
-<!-- METADATA START -->
+# <!-- METADATA START -->
 
----
+# ---
 
-<details> <summary> Metadata (TOML) </summary>
+# <details> <summary> Metadata </summary>
 
-```toml
-{tomli_w.dumps(metadata, multiline_strings=True)}
-```
-</details>
-"""
+# ```json
+# {json.dumps(metadata, sort_keys=True, indent=4, ensure_ascii=False)}
+# ```
+# </details>
+# """
+
+
+# def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
+#     return f"""
+# {summary}
+
+# <!-- METADATA START -->
+
+# ---
+
+# <details> <summary> Metadata (TOML) </summary>
+
+# ```toml
+# {tomli_w.dumps(metadata, multiline_strings=True)}
+# ```
+# </details>
+# """
 
 
 # def render_llm_output_file(metadata: dict[str, Any], summary: str) -> str:
