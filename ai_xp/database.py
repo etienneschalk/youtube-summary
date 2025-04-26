@@ -148,29 +148,10 @@ class FileDatabase:
             if scrapper is None:
                 print(f"ERROR Failed to fetch metadata for {video_id}")
             else:
-                self.fetch_one_metadata(video_id, scrapper)
+                fetch_one_metadata(self.metadata_lookup_dir_path, video_id, scrapper)
 
             print(f"Sleep for {sleep_seconds} seconds...")
             sleep(sleep_seconds)
-
-    def fetch_one_metadata(self, video_id: str, scrapper: YouTubeHtmlScrapper):
-        metadata_parsed = MetadataPath.from_scrapper(scrapper, "json")
-        output_filename = metadata_parsed.to_filename()
-        output_path = self.metadata_lookup_dir_path / output_filename
-        if metadata_parsed.status == "success":
-            output_path.write_text(scrapper.to_json())
-        elif metadata_parsed.status == "likely-video-unavailable":
-            message = "ERROR Cannot extract description, video likely unavailable"
-            print(message)
-            output_path.write_text(json.dumps({"error": message}))
-        elif metadata_parsed.status == "likely-an-advertisement":
-            message = (
-                "ERROR JSON cannot be parsed (Regexp can). Empirically, likely an ad."
-            )
-            print(message)
-            output_path.write_text(json.dumps({"error": message}))
-        print(f"OK Written {video_id} metadata to {output_path} ")
-        print(f"status ({metadata_parsed.status})")
 
     def fetch_missing_transcripts(self, *, sleep_seconds: int = 2):
         # Note: no retry mechanism implemented.
@@ -186,24 +167,9 @@ class FileDatabase:
         for idx, video_id in enumerate(missing_transcripts.index, 1):
             print(f"{idx}/{len(missing_transcripts)}: {video_id}")
             title = str(missing_transcripts.loc[video_id]["title"])
-            self.fetch_one_transcript(video_id, title)
+            fetch_one_transcript(self.transcript_lookup_dir_path, video_id, title)
             print(f"Sleep for {sleep_seconds} seconds...")
             sleep(sleep_seconds)
-
-    def fetch_one_transcript(self, video_id: str, title: str):
-        video_url = render_video_url(video_id)
-        result = get_youtube_transcript(video_url, preferred_languages=("fr", "en"))
-        title_slug = render_title_slug(title)
-        transcript_parsed_name = result.generate_transcript_parsed_name(title_slug)
-        transcript_output_file_path = (
-            self.transcript_lookup_dir_path / transcript_parsed_name.to_filename()
-        )
-        transcript_output_file_path.parent.mkdir(exist_ok=True, parents=True)
-        transcript_output_file_path.write_text(result.to_json())
-        print(
-            f"[  OK] Written transcript file for [[{title}]] into {transcript_output_file_path}"
-        )
-        print(f"status ({transcript_parsed_name.status})")
 
     def find_missing_llm_outputs_candidates(
         self,
@@ -407,3 +373,43 @@ def transcripts_dir_to_dataframe(transcript_lookup_dir_path: Path) -> pd.DataFra
         # Set expected empty column
         df = pd.DataFrame(columns=TranscriptPath.__annotations__.keys())
     return df.set_index(["language_code", "source", "video_id"])
+
+
+def fetch_one_metadata(
+    metadata_dir_path: Path, video_id: str, scrapper: YouTubeHtmlScrapper
+) -> Path:
+    metadata_parsed = MetadataPath.from_scrapper(scrapper, "json")
+    output_filename = metadata_parsed.to_filename()
+    output_file_path = metadata_dir_path / output_filename
+    if metadata_parsed.status == "success":
+        output_file_path.write_text(scrapper.to_json())
+    elif metadata_parsed.status == "likely-video-unavailable":
+        message = "ERROR Cannot extract description, video likely unavailable"
+        print(message)
+        output_file_path.write_text(json.dumps({"error": message}))
+    elif metadata_parsed.status == "likely-an-advertisement":
+        message = "ERROR JSON cannot be parsed (Regexp can). Empirically, likely an ad."
+        print(message)
+        output_file_path.write_text(json.dumps({"error": message}))
+    print(f"OK Written {video_id} metadata to {output_file_path} ")
+    print(f"status ({metadata_parsed.status})")
+    return output_file_path
+
+
+def fetch_one_transcript(
+    transcript_dir_path: Path,
+    video_id: str,
+    title: str,
+    *,
+    preferred_languages: tuple[str, ...] = ("fr", "en"),
+) -> Path:
+    video_url = render_video_url(video_id)
+    result = get_youtube_transcript(video_url, preferred_languages=preferred_languages)
+    title_slug = render_title_slug(title)
+    transcript_parsed_name = result.generate_transcript_parsed_name(title_slug)
+    output_file_path = transcript_dir_path / transcript_parsed_name.to_filename()
+    output_file_path.parent.mkdir(exist_ok=True, parents=True)
+    output_file_path.write_text(result.to_json())
+    print(f"[  OK] Written transcript file for [[{title}]] into {output_file_path}")
+    print(f"status ({transcript_parsed_name.status})")
+    return output_file_path

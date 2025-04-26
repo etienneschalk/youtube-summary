@@ -158,6 +158,8 @@ def get_youtube_transcript(
 def get_youtube_transcript_internal(
     video_id: str,
     preferred_languages: tuple[str, ...] | str,
+    *,
+    try_translation: bool = True,
 ) -> Transcript:
     ytt_api = YouTubeTranscriptApi()
     transcript_list = ytt_api.list(video_id)
@@ -165,6 +167,9 @@ def get_youtube_transcript_internal(
         result = transcript_list.find_transcript(preferred_languages)
         return result
     except YouTubeTranscriptApiException:
+        if not try_translation:
+            raise
+
         first_available_transcript = next(iter(transcript_list))
         print(first_available_transcript.language_code)
         available_translation_languages_codes = set(
@@ -177,7 +182,8 @@ def get_youtube_transcript_internal(
                 )
                 result = translated_transcript
                 print(
-                    f"Translated transcript from {first_available_transcript.language_code} to {preferred_language}."
+                    "Translated transcript from "
+                    f"{first_available_transcript.language_code} to {preferred_language}."
                 )
                 return result
         raise

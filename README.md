@@ -65,9 +65,27 @@ Copy the output in a JSON file.
 - [ ] Use title tag from video to extract at least the title, and inspect the description manually. Code susceptible to break frequently. See example HTML File.
 - [ ] Also use a pure txt file with list of videos as input source. To copy paste easily.
 
-## Commentaire sur une vidéo YouTube
+## Misc 
 
-@PurePolitique Je récupère les sous-titres de la vidéo que j'envoie ensuite à un modèle de langage à utilisation gratuite en lui demandant de le résumer.
+### Copy the diff of all python files into clipboard:
+
+
+FR : 
+
+> A partir de cet output de la commande git show, écris un titre et une description de Pull Request sur GitHub expliquant les modifications apportées.
+
+EN : 
+
+> From this output of the git show command, write a Pull Request title and description on GitHub explaining the changes made.
+
+
+```bash
+git ds -- '*.py' | xclip -sel clip
+```
+
+## [FR] Commentaire sur une vidéo YouTube
+
+Je récupère les sous-titres de la vidéo que j'envoie ensuite à un modèle de langage à utilisation gratuite en lui demandant de le résumer.
 
 Le modèle utilisé est : https://openrouter.ai/deepseek/deepseek-chat-v3-0324:free/api
 
@@ -98,8 +116,4 @@ Attention, il faut bien relire les résumés, car parfois des points-clefs sont 
 
 Les noms et prénoms sont aussi fréquemment charcutés, surtout lorsque les sous-titres sont générés automatiquement. Il faut repasser manuellement derrière, ou bien une autre solution serait de donner dans le prompt la liste des noms et prénoms des personnalités mentionnées dans une vidéo. Sur 28 minutes de Arte par exemple, la description contient toujours les 3 noms des intervenants, mais je n'ai hélas pas réussi à récupérer automatiquement les descriptions de vidéos youtube sans trop d'effort (les bibliothèques Python semblaient en panne).
 
-PS : merci pour vos vidéos qui sont toujours un plaisir à regarder !
 
-Voici mon code si cela vous intéresse (c'est brouillon, je suis en train de bidouiller) : https://github.com/etienneschalk/youtube-summary
-
-PS : merci pour vos vidéos qui sont toujours un plaisir à regarder !

@@ -196,7 +196,7 @@ class AiSummarizer:
         llm_output_dir_path: Path,
         prompt_language_code: str,
         prompt_family: str | None,
-    ) -> None:
+    ) -> dict[str, Path]:
         if prompt_family is None:
             prompt_family = video.best_prompt_family
 
@@ -251,6 +251,8 @@ class AiSummarizer:
         )
         print(f"[  OK] Written product into {json_path} for {transcript_file_path}")
         print(f"[  OK] Written md summary  into {md_path} for {transcript_file_path}")
+
+        return {"json": json_path, "md": md_path}
 
     def render_prompts(
         self,

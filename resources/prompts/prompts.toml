@@ -42,6 +42,9 @@ Tu es un assistant qui synthétises les transcripts vidéo.
 Résume les points clefs du transcript qui suit.
 Pour chaque point clef, écris une liste à puces de 3 à 5 éléments.
 Le transcript est en français et je souhaite un résumé en français.
+Le texte que tu produis en sortie doit être prêt à être publié, sans 
+autre intervention de ma part. Ne demande pas s'il doit être amélioré.
+
 Voici des éléments de contexte :
 
 ---
@@ -75,6 +78,8 @@ You are an assistant who summarizes video transcripts.
 Summarize the key points of the following transcript.
 For each key point, write a bulleted list of 3 to 5 items.
 The transcript is in English, and I want the summary to be in English.
+The text you produce as output must be ready for publication, 
+without further intervention on my side. Do not ask for further adjustments.
 
 Here are elements for context:
 
