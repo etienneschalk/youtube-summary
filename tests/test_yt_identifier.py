@@ -1,7 +1,6 @@
-# test_youtube.py
 import pytest
 
-from urllib.parse import urlparse, parse_qs
+from ai_xp.transcript import extract_video_id
 
 
 @pytest.mark.parametrize(
@@ -28,4 +27,4 @@ from urllib.parse import urlparse, parse_qs
     ],
 )
 def test_get_video_id(url: str, expected: str | None):
-    assert get_video_id(url) == expected
+    assert extract_video_id(url) == expected

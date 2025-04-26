@@ -203,6 +203,7 @@ class AiSummarizer:
         prompts = self.render_prompts(
             video, transcript_file_path, prompt_language_code, prompt_family
         )
+        # TODO eschalk Replace status field, in case the LLM answer is not a success.
         parsed_ai_summary_path = AiSummaryPath.from_transcript_path(
             prompt_family, TranscriptPath.from_path(transcript_file_path)
         )

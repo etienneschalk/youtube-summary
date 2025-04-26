@@ -1,7 +1,7 @@
+import json
 import os
 import shutil
 import subprocess
-import json
 from typing import Optional
 
 import click
@@ -15,8 +15,13 @@ except ImportError:
     PYTUBE_AVAILABLE = False
 
 
+DEFAULT_DOWNLOADED_VIDEOS_OUTPUT_DIR = "generated/downloaded_videos"
+DEFAULT_TEMP_CLIPS_OUTPUT_DIR = "generated/temp_clips"
+DEFAULT_CLIPPED_VIDEOS_OUTPUT_DIR = "generated/clips/montage.mp4"
+
+
 def download_youtube_video_pytube(
-    url: str, output_path: str = "downloads"
+    url: str, output_path: str = DEFAULT_DOWNLOADED_VIDEOS_OUTPUT_DIR
 ) -> Optional[str]:
     """Download a YouTube video.
 
@@ -51,14 +56,14 @@ def download_youtube_video_pytube(
 
 
 def download_youtube_video_youtubedl(
-    url: str, output_path: str = "downloads"
+    url: str, output_path: str = DEFAULT_DOWNLOADED_VIDEOS_OUTPUT_DIR
 ) -> Optional[str]:
     """Download a YouTube video using youtube-dl."""
     return _download_with_tool(url, output_path, tool="youtube-dl")
 
 
 def download_youtube_video_ytdlp(
-    url: str, output_path: str = "downloads"
+    url: str, output_path: str = DEFAULT_DOWNLOADED_VIDEOS_OUTPUT_DIR
 ) -> Optional[str]:
     """Download a YouTube video using yt-dlp."""
     return _download_with_tool(url, output_path, tool="yt-dlp")
@@ -106,7 +111,7 @@ def auto_select_downloader() -> str:
 
 
 # def download_youtube_video_youtubedl(
-#     url: str, output_path: str = "downloads"
+#     url: str, output_path: str = DEFAULT_DOWNLOADED_VIDEOS_OUTPUT_DIR
 # ) -> Optional[str]:
 #     """Download a YouTube video using youtube-dl.
 
@@ -172,20 +177,36 @@ def extract_clips_moviepy(
     """
     clips = []
     try:
-        with VideoFileClip(video_path) as video:
-            if segments:
-                for seg in segments:
-                    start = seg["start"]
-                    duration = seg["duration"]
-                    clip = video.subclipped(start, start + duration)
+        video = VideoFileClip(video_path)
+        # XXX video is not closed ; if it is closed, then clips point to nothing.
+        # Better resource mgmgt is needed.
+        if segments:
+            for seg in segments:
+                start = seg["start"]
+                duration = seg["duration"]
+                clip = video.subclipped(start, start + duration)
+                clips.append(clip)
+        else:
+            total_duration = int(video.duration)
+            for start_time in range(0, total_duration, interval):
+                if start_time + clip_duration <= total_duration:
+                    clip = video.subclipped(start_time, start_time + clip_duration)
                     clips.append(clip)
-            else:
-                total_duration = int(video.duration)
-                for start_time in range(0, total_duration, interval):
-                    if start_time + clip_duration <= total_duration:
-                        clip = video.subclipped(start_time, start_time + clip_duration)
-                        clips.append(clip)
-            return clips
+        return clips
+        # with VideoFileClip(video_path) as video:
+        #     if segments:
+        #         for seg in segments:
+        #             start = seg["start"]
+        #             duration = seg["duration"]
+        #             clip = video.subclipped(start, start + duration)
+        #             clips.append(clip)
+        #     else:
+        #         total_duration = int(video.duration)
+        #         for start_time in range(0, total_duration, interval):
+        #             if start_time + clip_duration <= total_duration:
+        #                 clip = video.subclipped(start_time, start_time + clip_duration)
+        #                 clips.append(clip)
+        #     return clips
     except Exception as e:
         print(f"Error extracting clips with moviepy: {e}")
         return []
@@ -193,7 +214,7 @@ def extract_clips_moviepy(
 
 def extract_clips_ffmpeg(
     video_path: str,
-    output_dir: str = "temp_clips",
+    output_dir: str = DEFAULT_TEMP_CLIPS_OUTPUT_DIR,
     clip_duration: int = 5,
     interval: int = 60,
     segments: Optional[list[dict[str, float]]] = None,
@@ -279,7 +300,7 @@ def extract_clips_ffmpeg(
 
 
 def create_montage_moviepy(
-    clips: list[VideoFileClip], output_path: str = "montage.mp4"
+    clips: list[VideoFileClip], output_path: str = DEFAULT_CLIPPED_VIDEOS_OUTPUT_DIR
 ) -> None:
     """Create a montage from clips using MoviePy.
 
@@ -306,7 +327,7 @@ def create_montage_moviepy(
 
 
 def create_montage_ffmpeg(
-    clips_paths: list[str], output_path: str = "montage.mp4"
+    clips_paths: list[str], output_path: str = DEFAULT_CLIPPED_VIDEOS_OUTPUT_DIR
 ) -> None:
     """Create a montage from clip files using ffmpeg.
 
@@ -391,7 +412,11 @@ def clean_up(paths: list[str]) -> None:
 )
 @click.option("--clip-duration", default=5, help="Duration of each clip (in seconds)")
 @click.option("--interval", default=60, help="Interval between clips (in seconds)")
-@click.option("--output", default="montage.mp4", help="Output montage file path")
+@click.option(
+    "--output",
+    default=DEFAULT_CLIPPED_VIDEOS_OUTPUT_DIR,
+    help="Output montage file path",
+)
 def main(
     youtube_url: str,
     method: str,
@@ -459,11 +484,16 @@ def main(
         )
         create_montage_moviepy(clips, output)
     elif method == "ffmpeg":
+        # XXX TODO eschalk untested
         clips = extract_clips_ffmpeg(
-            downloaded_video, "temp_clips", clip_duration, interval, segments
+            downloaded_video,
+            DEFAULT_TEMP_CLIPS_OUTPUT_DIR,
+            clip_duration,
+            interval,
+            segments,
         )
         create_montage_ffmpeg(clips, output)
-        # clean_up(["temp_clips"])
+        clean_up([DEFAULT_CLIPPED_VIDEOS_OUTPUT_DIR])
     else:
         print("Methode non reconnue. Veuillez choisir 'moviepy' ou 'ffmpeg'.")
 
@@ -471,10 +501,6 @@ def main(
 
 
 # Tes fonctions extract_clips_moviepy, extract_clips_ffmpeg, create_montage_moviepy, create_montage_ffmpeg, clean_up restent inchangées
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()

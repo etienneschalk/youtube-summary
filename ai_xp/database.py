@@ -109,7 +109,7 @@ class FileDatabase:
         return search(df, value)
 
     def inputs_with_missing_metadata(self) -> pd.DataFrame:
-        df = self.input_dataframe.drop(self.metadata_dataframe.index)
+        df = self.input_dataframe.drop(self.metadata_dataframe.index, errors="ignore")
         return df
 
     def inputs_with_missing_transcripts(
@@ -127,7 +127,8 @@ class FileDatabase:
         # indexer = ["en",]
         # indexer = ["en", "manually_created"]
         df = self.input_dataframe.drop(
-            self.transcript_dataframe.loc[*indexer].index.get_level_values("video_id")
+            self.transcript_dataframe.loc[*indexer].index.get_level_values("video_id"),
+            errors="ignore",
         )
         return df
 
@@ -153,7 +154,12 @@ class FileDatabase:
             print(f"Sleep for {sleep_seconds} seconds...")
             sleep(sleep_seconds)
 
-    def fetch_missing_transcripts(self, *, sleep_seconds: int = 2):
+    def fetch_missing_transcripts(
+        self,
+        *,
+        sleep_seconds: int = 2,
+        preferred_languages: tuple[str, ...] = ("fr", "en"),
+    ):
         # Note: no retry mechanism implemented.
         # If a fetch resulted in error, it will not be retried.
         # For advertisements or videos unavailable, this is OK
@@ -167,7 +173,12 @@ class FileDatabase:
         for idx, video_id in enumerate(missing_transcripts.index, 1):
             print(f"{idx}/{len(missing_transcripts)}: {video_id}")
             title = str(missing_transcripts.loc[video_id]["title"])
-            fetch_one_transcript(self.transcript_lookup_dir_path, video_id, title)
+            fetch_one_transcript(
+                self.transcript_lookup_dir_path,
+                video_id,
+                title,
+                preferred_languages=preferred_languages,
+            )
             print(f"Sleep for {sleep_seconds} seconds...")
             sleep(sleep_seconds)
 
@@ -196,7 +207,7 @@ class FileDatabase:
             )
 
             # Loc missing LLM output candidates
-            df = db.input_dataframe.loc[video_ids]
+            df = db.input_dataframe.drop(video_ids, errors="ignore")
             df["metadata_status"] = db.metadata_dataframe.loc[video_ids][["status"]]
             df["transcript_status"] = transcripts.loc[video_ids][["status"]]
             df["metadata_path"] = db.metadata_dataframe.loc[video_ids][["path"]]
@@ -381,6 +392,8 @@ def fetch_one_metadata(
     metadata_parsed = MetadataPath.from_scrapper(scrapper, "json")
     output_filename = metadata_parsed.to_filename()
     output_file_path = metadata_dir_path / output_filename
+    if output_file_path.exists():
+        raise FileExistsError
     if metadata_parsed.status == "success":
         output_file_path.write_text(scrapper.to_json())
     elif metadata_parsed.status == "likely-video-unavailable":
@@ -401,7 +414,7 @@ def fetch_one_transcript(
     video_id: str,
     title: str,
     *,
-    preferred_languages: tuple[str, ...] = ("fr", "en"),
+    preferred_languages: tuple[str, ...],
 ) -> Path:
     video_url = render_video_url(video_id)
     result = get_youtube_transcript(video_url, preferred_languages=preferred_languages)
@@ -409,6 +422,8 @@ def fetch_one_transcript(
     transcript_parsed_name = result.generate_transcript_parsed_name(title_slug)
     output_file_path = transcript_dir_path / transcript_parsed_name.to_filename()
     output_file_path.parent.mkdir(exist_ok=True, parents=True)
+    if output_file_path.exists():
+        raise FileExistsError
     output_file_path.write_text(result.to_json())
     print(f"[  OK] Written transcript file for [[{title}]] into {output_file_path}")
     print(f"status ({transcript_parsed_name.status})")
